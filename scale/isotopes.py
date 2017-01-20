@@ -437,19 +437,20 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         N,X,Y,dX,dY = [],[],[],[],[]
         
         for G in [CARE[1], CARE[2], CARE[3], CARE[4]]:
-          NP = G.GetN();  N.append(NP)
-          X.append(np.ndarray(NP, 'float64', G.GetX()));  dX.append(np.ndarray(NP, 'float64', G.GetEX()))
-          Y.append(np.ndarray(NP, 'float64', G.GetY()));  dY.append(np.ndarray(NP, 'float64', G.GetEY()))
-        
+          NP = G.GetN();       N.append(NP)
+          X.append(G.GetX()); dX.append(G.GetEX())
+          Y.append(G.GetY()); dY.append(G.GetEY())
+                  
         # 1. Linear Scale Calibration
         self.S0.Set(N[0])
-        for p in range(N[0]):  self.S0.SetPoint(p,X[0][p],Y[0][p]); self.S0.SetPointError(p,dX[0][p],dY[0][p])
+        for p in range(N[0]):  
+          self.S0.SetPoint(p,X[0][p],Y[0][p]); self.S0.SetPointError(p,dX[0][p],dY[0][p])
         C = self.S0.Fit('lisc',  'QNRS') 
         C.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, True); dw = er[0]
         
         # 2. Spline Correction
         if N[1]>5:
-          self.S1.Set(N[1]); self.PB5 = True
+          self.PB5 = True
           for p in range(N[1]):  self.S1.SetPoint(p,X[1][p],Y[1][p]); self.S1.SetPointError(p,dX[1][p],dY[1][p])
           W = [1/V for V in dY[1]]; self.spline.Reset(X[1],Y[1],W);  c, dc  = self.SplineU.Eval(w), 0.0
           for p in range(N[1]): dc += (abs(self.SplineU.Eval(X[1][p])-Y[1][p])**2 + dY[1][p]**2)**0.5

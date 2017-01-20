@@ -62,9 +62,7 @@ class ToDo:
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
-      print 'Wrong option'
-      self.Usage(argv[0])
-      sys.exit(2)
+      print 'Wrong option'; Usage(); sys.exit(2)
     date, time = False, False
     for opt, arg in opts:
       if   opt in ("-h", "--help"):        Usage()
@@ -133,11 +131,11 @@ class Histogram:
     cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
     if cfg.has_option('scale', 'cdif'):  self.cdif = cfg.getfloat('scale', 'cdif')
     else:                                self.cdif = 0.01
-    if todo.BEPC:
-      try:                from bepc.bepc import EDGE; self.EME = EDGE(todo.scalefile, todo.cfg_file)
+    if   self.EME and 'BEPC' in todo.orig:
+      try:                from bepc.bepc import EDGE;      self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'BEPC is not yet implemented'; exit(0)
-    elif todo.V2K:
-      try:                from V2K import BEMS;  self.EME = BEMS(todo.scalefile, todo.cfg_file)
+    elif self.EME and  'VEPP2K' in todo.orig:
+      try:                from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'V2K is not yet implemented'; exit(0)
     if self.tokeV: 
       from scale.isotopes import Isotopes

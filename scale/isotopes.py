@@ -99,7 +99,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.PADS[2].cd(); self.PADS[2].Clear(); self.PADS[2].SetGrid(); self.PADS[2].SetLogy()
     H = self.hps.Rebin(rebin,"H")
     B = self.SP.Background(H)
-    self.SP.Search(H, 2.0, 'nodraw', 0.001) # the parameters are sigma, options, threshold
+    self.SP.Search(H, 2.0, 'nodraw', self.amin) # the parameters are sigma, options, threshold
     self.hps.DrawCopy('HIST'); self.cv.Modified(); self.cv.Update()
 
     N  =  self.SP.GetNPeaks()
@@ -140,6 +140,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
           E_t, dE_t  = line['W'], line['dW']
           if abs(p['E']-E_t) < self.erec or ((abs(p['E']-E_t) < 2*self.erec) and ('PB5' in name)):
             self.KnownPeaks.append({'name':name, 'E':E_t, 'dE':dE_t, 'X':p['E'], 'A':p['A'], 'B':p['B'], 'incc':line['CC'], 'inrc':line['RC']})
+    self.KnownPeaks.sort(key = lambda peak: peak['E'])
     self.ScalePeaks  = [el for el in self.KnownPeaks if          el['incc']];       self.nScalePeaks = len(self.ScalePeaks)
     self.ShapePeaks  = [el for el in self.KnownPeaks if          el['inrc']];       self.nShapePeaks = len(self.ShapePeaks)
     self.PulsePeaks  = [el for el in self.KnownPeaks if 'PB5' in el['name']];       self.nPulsePeaks = len(self.PulsePeaks)
@@ -236,9 +237,10 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       for pk in self.PulsePeaks:
         n = self.PulsePeaks.index(pk)
         x, y, dx, dy = pk['E'], pk[K]['p1'] - pk['E'], pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2)**0.5
-        X.append(x); Y.append(y); W.append(1./dy)
+        X.append(x); Y.append(y); W.append(1.0/dy)
         self.S1.SetPoint(     n,  x,  y) 
         self.S1.SetPointError(n, dx, dy)
+
       self.spline.Reset(X,Y,W)
 
 # 3) PULSER AMPLITUDES LINEAR CORRECTION
@@ -376,7 +378,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.emin = cfg.getfloat(S, 'emin');    self.emax = cfg.getfloat(S, 'emax')
       self.fitL = cfg.getfloat(S, 'fitL');    self.fitR = cfg.getfloat(S, 'fitR')
       self.erec = cfg.getfloat(S, 'erec');    self.tbpa = cfg.getfloat(S, 'tbpa')
-      self.nitr = cfg.getint(  S, 'nitr')
+      self.nitr = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
       if cfg.has_option(S, 'name0'): self.names[0] = '%11s' % cfg.get(S, 'name0')
       if cfg.has_option(S, 'name1'): self.names[1] = '%11s' % cfg.get(S, 'name1')
       if cfg.has_option(S, 'name2'): self.names[2] = '%11s' % cfg.get(S, 'name2')
@@ -452,7 +454,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         if N[1]>5:
           self.PB5 = True
           for p in range(N[1]):  self.S1.SetPoint(p,X[1][p],Y[1][p]); self.S1.SetPointError(p,dX[1][p],dY[1][p])
-          W = [1/V for V in dY[1]]; self.spline.Reset(X[1],Y[1],W);  c, dc  = self.SplineU.Eval(w), 0.0
+          W = [1.0/V for V in dY[1]]; self.spline.Reset(X[1],Y[1],W);  c, dc  = self.SplineU.Eval(w), 0.0
           for p in range(N[1]): dc += (abs(self.SplineU.Eval(X[1][p])-Y[1][p])**2 + dY[1][p]**2)**0.5
           dc = dc/N[1]
         else: self.PB5, c, dc = False, 0.0, 0.0

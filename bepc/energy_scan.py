@@ -77,7 +77,7 @@ class Energy_Scan:
     for PointN in range(len(Energy_Points)):
       print '\nPoint %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
       S = Histogram(todo)
-      if todo.BEPC:
+      if todo.edge:
         flist = [el for el in Energy_Points[PointN] if 'elec' in el]; S.nfile = len(flist); E = S.Go(flist)
         flist = [el for el in Energy_Points[PointN] if 'posi' in el]; S.nfile = len(flist); P = S.Go(flist)
         if E and P:

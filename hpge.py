@@ -20,8 +20,7 @@ def Usage():
  ║ -t HHMMSS,   --time    = HHMMSS    : time from which to start (hour, min, sec), ║
  ║ -s filename, --scale   = filename  : file to store/restore calibration results, ║
  ║ -c filename, --cfg     = filename  : file to read various parameters,           ║
- ║              --BEPC                : try to measure BEPC-II beam energy,        ║
- ║              --V2K                 : try to measure VEPP-2000 beam energy,      ║
+ ║              --edge                : try to measure beam energy by Compton edge,║
  ║              --escan               : deal with beam energy scan experiment.     ║
  ╚═════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
@@ -34,8 +33,9 @@ class ToDo:
 
   def __init__(self):
 
-    cfg = ConfigParser.ConfigParser(); cfg.read('globals.cfg')
+    cfg = ConfigParser.ConfigParser(); cfg.read('_globals_.cfg')
     if cfg.has_option('globals', 'data_folder'):  self.root = cfg.get('globals', 'data_folder')
+    if cfg.has_option('globals', 'data_origin'):  self.orig = cfg.get('globals', 'data_origin')
     else:                                         exit()
     try:
       Years = os.listdir(self.root); Years.sort()
@@ -45,20 +45,20 @@ class ToDo:
     Days  = os.listdir(self.root+Years[-1])
     if len(Days)==1: Days.extend(os.listdir(self.root+Years[-2]));  
     Days.sort()
-    self.folder,   self.efolder  = Days[-2], Days[-1]
-    self.tfrom,    self.nfile    = 0   , 1
-    self.filename   = self.lastfile = '' 
-    self.tokeV      = self.online   = True
-    self.prompt     = self.listonly = False
-    self.BEPC       = self.V2K      = False
-    self.escan      = False
+    self.folder,   self.efolder   = Days[-2], Days[-1]
+    self.tfrom,    self.nfile     = 0   , 1
+    self.filename = self.lastfile = '' 
+    self.tokeV    = self.online   = True
+    self.prompt   = self.listonly = False
+    self.edge     = self.escan    = False
+    
     self.scalefile  = 'escale.root'
     self.cfg_file   = 'online.cfg'
     if len(sys.argv)>1: self.Options(sys.argv)
 
   def Options(self,argv):
     sopt = "d:e:f:t:n:s:c:ihkl"
-    lopt = ["folder=","efolder=","file=","time=","nfiles=","scale=","cfg=","interactive","help","keV","list","BEPC","V2K","escan"]
+    lopt = ["folder=","efolder=","file=","time=","nfiles=","scale=","cfg=","interactive","help","keV","list","edge","escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
@@ -78,8 +78,7 @@ class ToDo:
       elif opt in ("-s", "--scale"):       self.scalefile = arg;  
       elif opt in ("-c", "--cfg"):         self.cfg_file  = arg;  
       elif opt in ("-l", "--list"):        self.listonly  = True
-      elif opt in (      "--BEPC"):        self.BEPC      = True;     self.V2K  = self.tokeV = False
-      elif opt in (      "--V2K"):         self.V2K       = True;     self.BEPC = self.tokeV = False
+      elif opt in (      "--edge"):        self.edge      = True;     self.tokeV = False
       elif opt in (      "--escan"):       self.escan     = True;     self.online = False
     cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file'): self.scalefile = cfg.get('scale', 'file'); self.online = False; date = True
@@ -130,7 +129,7 @@ class Histogram:
 
   def __init__(self,todo):
     self.nfile, self.prompt = todo.nfile, todo.prompt
-    self.tokeV, self.EME    = todo.tokeV, False
+    self.tokeV, self.orig, self.EME    = todo.tokeV, todo.orig, todo.edge
     cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
     if cfg.has_option('scale', 'cdif'):  self.cdif = cfg.getfloat('scale', 'cdif')
     else:                                self.cdif = 0.01

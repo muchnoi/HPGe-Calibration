@@ -39,7 +39,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.asps = ROOT.TF1('asps', LineShape(), 0.0, 1.0, 6);    self.asps.SetLineColor(ROOT.kBlue+2)
       self.asps.SetParNames('Amp','E_{0}, keV', '#sigma_{R}, keV', '#sigma_{L}, keV', 'Compton', 'Background')
       self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (0.5, 20.0),  (0.0,0.10), (0.0,1.e+5))
-    elif action == 'application':
+#    elif action == ('application' or 'verification'):
+    else:
       self.cv   =  ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 502)
       self.PADS = [ROOT.TPad('PAD5', 'Scale',      0.01, 0.01, 0.49, 0.99, 0, 1),
                    ROOT.TPad('PAD6', 'Resolution', 0.51, 0.01, 0.99, 0.99, 0, 1)]
@@ -428,7 +429,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Get_Calibration(self, t = 0, w = 1000.0):
     x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
-    OD = {'T':[], 'dT':[], 'Z':[], 'G':[], 'N':[], 'W':[], 'dW':[], 'C':[], 'dC':[], 'R':[], 'dR':[], 'L':[], 'dL':[]}
+    OD = {'T':[], 'dT':[], 'Z':[], 'G':[], 'N':[], 'dW':[], 'C':[], 'dC':[], 'R':[], 'dR':[], 'L':[], 'dL':[]}
     f, CARE  = ROOT.TFile(self.outfile), ROOT.TList()
     print 'Get calibration from: ', self.outfile  
     for el in [el.GetName() for el in f.GetListOfKeys()]:
@@ -439,9 +440,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         N,X,Y,dX,dY = [],[],[],[],[]
         
         for G in [CARE[1], CARE[2], CARE[3], CARE[4]]:
-          NP = G.GetN();       N.append(NP)
-          X.append(G.GetX()); dX.append(G.GetEX())
-          Y.append(G.GetY()); dY.append(G.GetEY())
+          N.append(G.GetN()); X.append(G.GetX()); dX.append(G.GetEX()); Y.append(G.GetY()); dY.append(G.GetEY())
                   
         # 1. Linear Scale Calibration
         self.S0.Set(N[0])
@@ -461,12 +460,13 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         self.Show_Energy_Scale()
 
         # 3. Resolution
-        self.RC.Set(N[2])
-        for p in range(N[2]):  self.RC.SetPoint(p,X[2][p],Y[2][p]); self.RC.SetPointError(p,dX[2][p],dY[2][p])
+        self.RC.Set(N[2]) 
+        for p in range(N[2]):   self.RC.SetPoint(p,X[2][p],Y[2][p]); self.RC.SetPointError(p,dX[2][p],dY[2][p])
 
-        self.RP.Set(N[3])
-        for p in range(N[3]):  self.RP.SetPoint(p,X[3][p],Y[3][p]); self.RP.SetPointError(p,dX[3][p],dY[3][p])
-        if self.PB5: self.RP.Fit('pulser','QRN')
+        if self.PB5: 
+          self.RP.Set(N[3])
+          for p in range(N[3]): self.RP.SetPoint(p,X[3][p],Y[3][p]); self.RP.SetPointError(p,dX[3][p],dY[3][p])
+          self.RP.Fit('pulser','QRN')
         
         R = self.RC.Fit('eres_C','QRNS')
         
@@ -492,13 +492,40 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         if not R.Status(): # i. e. all the fits are O.K.
           OD['T'].append(0.5*(utb+ute));  OD['dT'].append(0.5*(ute-utb))
           OD['Z'].append(zero);           OD['G' ].append(gain)
-          OD['N'].append(ptype)
-          OD['W'].append(w-c);            OD['dW'].append((dw**2 + dc**2)**0.5)
+          OD['N'].append(ptype);          OD['dW'].append(dw)
           OD['C'].append(c);              OD['dC'].append(dc)
           OD['R'].append(0.01*r*w);       OD['dR'].append(0.01*dr*w)
           OD['L'].append(0.01*l*w);       OD['dL'].append(0.01*dl*w)
     f.Close()
     return(OD)    
+    
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def Check_Scale(self, energy):
+    from numpy import asarray
+    E = self.Get_Calibration(t=0, w=energy)
+    for k,v in E.iteritems():  E[k] = asarray(v)
+    mchan = (energy - E['Z'].mean()) / E['G'].mean()
+    NE, W, TF = len(E['T']), [], '#splitline{%b %d}{%H:%M}%F1970-01-01 00:00:00'
+    for n in range(NE):  W.append(E['Z'][n] + E['G'][n]*mchan)
+    W = asarray(W)
+    e1 = ROOT.TGraphErrors(NE, E['T'], W,      E['dT'], E['dW']); e1.SetTitle('CH. %d absolute energy equivalent'           % mchan )
+    e2 = ROOT.TGraphErrors(NE, E['T'], E['C'], E['dT'], E['dC']); e2.SetTitle('pulser correction for %5.0f keV #gamma-rays' % energy) 
+    e3 = ROOT.TGraphErrors(NE, E['T'], E['R'], E['dT'], E['dR']); e3.SetTitle('#sigma_{R} for %5.0f keV #gamma-rays'        % energy)
+    e4 = ROOT.TGraphErrors(NE, E['T'], E['L'], E['dT'], E['dL']); e4.SetTitle('#sigma_{L} for %5.0f keV #gamma-rays'        % energy)
+    lg = ROOT.TLegend(0.75, 0.75, 0.98, 0.95, '', 'brNDC');  lg.AddEntry(e1, self.outfile, 'lpe')
+    cs = ROOT.TCanvas('cs','scale & resolution', 2, 2, 1002, 1002); cs.Divide(2,2)
+    cs.cd(1); cs.GetPad(1).SetGrid(); e1.Draw('AP'); lg.Draw('SAME')
+    cs.cd(2); cs.GetPad(2).SetGrid(); e2.Draw('AP'); lg.Draw('SAME')
+    cs.cd(3); cs.GetPad(3).SetGrid(); e3.Draw('AP'); lg.Draw('SAME')
+    cs.cd(4); cs.GetPad(4).SetGrid(); e4.Draw('AP'); lg.Draw('SAME')
+    for g in [e1,e2,e3,e4]: 
+      g.SetMarkerStyle(20);           g.SetMarkerColor(ROOT.kRed);    g.SetLineColor(ROOT.kRed)
+      g.GetXaxis().SetTimeDisplay(1); g.GetXaxis().SetTimeFormat(TF); g.GetXaxis().SetLabelOffset(0.03)
+      g.GetYaxis().SetDecimals();     g.GetYaxis().SetTitle('keV');   g.GetYaxis().SetTitleOffset(1.2)
+
+    cs.Modified(); cs.Update(); raw_input('Have a look, then press <Enter> to exit.')
+    self.cv.cd(); self.cv.Clear(); self.cv.Modified(); self.cv.Update() # This is to prevent segmentation fault on exit()
+
     
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

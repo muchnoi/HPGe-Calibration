@@ -19,6 +19,7 @@ def Usage():
  ║ -e YYYYMMDD, --efolder = YYYYMMDD  : date to  end  with (year, month, day),     ║
  ║ -t HHMMSS,   --time    = HHMMSS    : time from which to start (hour, min, sec), ║
  ║ -s filename, --scale   = filename  : file to store/restore calibration results, ║
+ ║ -v energy,   --verify  = energy    : calibration results for an energy [keV],   ║
  ║ -c filename, --cfg     = filename  : file to read various parameters,           ║
  ║              --edge                : try to measure beam energy by Compton edge,║
  ║              --escan               : deal with beam energy scan experiment.     ║
@@ -27,6 +28,7 @@ def Usage():
 
 if ('-h' in sys.argv) or ('--help' in sys.argv): Usage() 
 else: import ROOT
+
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class ToDo:
@@ -49,39 +51,39 @@ class ToDo:
     self.tfrom,    self.nfile     = 0   , 1
     self.filename = self.lastfile = '' 
     self.tokeV    = self.online   = True
-    self.prompt   = self.listonly = False
-    self.edge     = self.escan    = False
+    self.prompt   = self.listonly = self.edge = self.escan = self.verify = False
     
     self.scalefile  = 'escale.root'
     self.cfg_file   = 'online.cfg'
     if len(sys.argv)>1: self.Options(sys.argv)
 
   def Options(self,argv):
-    sopt = "d:e:f:t:n:s:c:ihkl"
-    lopt = ["folder=","efolder=","file=","time=","nfiles=","scale=","cfg=","interactive","help","keV","list","edge","escan"]
+    sopt = "d:e:f:t:n:s:c:v:ihkl"
+    lopt = ["folder=","efolder=","file=","time=","nfiles=","scale=","cfg=","verify=","interactive","help","keV","list","edge","escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
       print 'Wrong option'; Usage(); sys.exit(2)
     date, time = False, False
-    for opt, arg in opts:
-      if   opt in ("-h", "--help"):        Usage()
-      elif opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
-      elif opt in ("-n", "--nf"):          self.nfile     = int(arg)
-      elif opt in ("-d", "--folder"):      self.folder    = arg;      self.online = False; date = True
-      elif opt in ("-e", "--efolder"):     self.efolder   = arg;      self.online = False
-      elif opt in ("-f", "--file"):        self.filename  = arg;      self.online = False
-      elif opt in ("-t", "--time"):        self.tfrom     = int(arg); self.online = False; time = True
-      elif opt in ("-k", "--keV"):         self.tokeV     = False
-      elif opt in ("-s", "--scale"):       self.scalefile = arg;  
-      elif opt in ("-c", "--cfg"):         self.cfg_file  = arg;  
-      elif opt in ("-l", "--list"):        self.listonly  = True
-      elif opt in (      "--edge"):        self.edge      = True;     self.tokeV = False
-      elif opt in (      "--escan"):       self.escan     = True;     self.online = False
     cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file'): self.scalefile = cfg.get('scale', 'file'); self.online = False; date = True
     if cfg.has_option('scan', 'bdate'):    self.folder = cfg.get('scan', 'bdate'); self.online = False; date = True
     if cfg.has_option('scan', 'edate'):   self.efolder = cfg.get('scan', 'edate'); self.online = False
+    for opt, arg in opts:
+      if   opt in ("-h", "--help"):        Usage()
+      elif opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
+      elif opt in ("-n", "--nf"):          self.nfile     = int(arg)
+      elif opt in ("-d", "--folder"):      self.folder    = arg;      self.online = False #; date = True
+      elif opt in ("-e", "--efolder"):     self.efolder   = arg;      self.online = False
+      elif opt in ("-f", "--file"):        self.filename  = arg;      self.online = False
+      elif opt in ("-t", "--time"):        self.tfrom     = int(arg); self.online = False #; time = True
+      elif opt in ("-k", "--keV"):         self.tokeV     = False
+      elif opt in ("-s", "--scale"):       self.scalefile = arg;  
+      elif opt in ("-c", "--cfg"):         self.cfg_file  = arg;  
+      elif opt in ("-v", "--verify"):      self.verify    = True;     self.energy = float(arg);  
+      elif opt in ("-l", "--list"):        self.listonly  = True
+      elif opt in (      "--edge"):        self.edge      = True;     self.tokeV  = False
+      elif opt in (      "--escan"):       self.escan     = True;     self.online = False
 
   def GetList(self):
     fold_list, file_list = [], []
@@ -236,6 +238,10 @@ def main(argv):
     from bepc.energy_scan import Energy_Scan
     InTime = Energy_Scan()
     InTime.Go(flist,todo)
+  elif todo.verify:
+    from scale.isotopes import Isotopes
+    InTime = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
+    InTime.Check_Scale(todo.energy)
   else:
     SP = Histogram(todo)
     try:
@@ -251,7 +257,8 @@ def main(argv):
           break
       raw_input('All done. <Enter> to quit.')
     except KeyboardInterrupt: print '\nExecution is interrupted'
-  sys.exit(0)
+  
+  exit()
   
 
 if __name__ == "__main__": main(sys.argv)  

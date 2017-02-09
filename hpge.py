@@ -4,26 +4,28 @@ import os, sys, getopt, time, string, gzip, ConfigParser
 
 def Usage():
   print '''
- ╔ Python script to process HPGe spectra. © 2005-2017 N.Yu.Muchnoi ════════════════╗
- ║                                              ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]                │ Last update: January 18, 2017  │ ║
- ║                                              ╰────────────────────────────────╯ ║
- ║ List of options:                                                                ║
- ║ -h,          --help                : print this help message and exit,          ║
- ║ -i,          --interactive         : if set, script will prompt to proceed,     ║
- ║ -k,          --keV                 : use channels not keV,                      ║
- ║ -l,          --list                : just show the list of files,               ║
- ║ -f expr,     --file = expr         : file name(s) under specified folder(s),    ║
- ║ -n N,        --nf   = N            : put several files into one spectrum,       ║
- ║ -d YYYYMMDD, --folder  = YYYYMMDD  : date to start from (year, month, day),     ║
- ║ -e YYYYMMDD, --efolder = YYYYMMDD  : date to  end  with (year, month, day),     ║
- ║ -t HHMMSS,   --time    = HHMMSS    : time from which to start (hour, min, sec), ║
- ║ -s filename, --scale   = filename  : file to store/restore calibration results, ║
- ║ -v energy,   --verify  = energy    : calibration results for an energy [keV],   ║
- ║ -c filename, --cfg     = filename  : file to read various parameters,           ║
- ║              --edge                : try to measure beam energy by Compton edge,║
- ║              --escan               : deal with beam energy scan experiment.     ║
- ╚═════════════════════════════════════════════════════════════════════════════════╝
+ ╔ Python script to process HPGe spectra. © 2005-2017 N.Yu.Muchnoi ═══════════════╗
+ ║                                             ╭────────────────────────────────╮ ║
+ ║ Usage: %0000000012s [options]               │ Last update: February 8, 2017  │ ║
+ ║                                             ╰────────────────────────────────╯ ║
+ ║ List of options:                                                               ║
+ ║ -h,          --help               : print this help message and exit.          ║
+ ║ -i,          --interactive        : if set, script will prompt to proceed.     ║
+ ║ -k,          --keV                : use channels not keV.                      ║
+ ║ -l,          --list               : just show the list of files.               ║
+ ║ -f expr,     --file = expr        : file name(s) under specified folder(s).    ║
+ ║ -n N,        --nf   = N           : put several files into one spectrum.       ║
+ ║ -d YYYYMMDD, --folder  = YYYYMMDD : date to start from (year, month, day).     ║
+ ║ -e YYYYMMDD, --efolder = YYYYMMDD : date to  end  with (year, month, day).     ║
+ ║ -t HHMMSS,   --time    = HHMMSS   : time from which to start (hour, min, sec). ║
+ ║ -c filename, --cfg     = filename : file to read various parameters,           ║
+ ║                                     otherwise "default.cfg" is used.           ║
+ ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
+ ║                                     otherwise "escale.root" is used.           ║
+ ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
+ ║              --edge               : try to measure beam energy by Compton edge.║
+ ║              --escan              : deal with beam energy scan experiment.     ║
+ ╚════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
 
 if ('-h' in sys.argv) or ('--help' in sys.argv): Usage() 
@@ -64,26 +66,29 @@ class ToDo:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
       print 'Wrong option'; Usage(); sys.exit(2)
-    date, time = False, False
-    cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
-    if cfg.has_option('scale', 'file'): self.scalefile = cfg.get('scale', 'file'); self.online = False; date = True
-    if cfg.has_option('scan', 'bdate'):    self.folder = cfg.get('scan', 'bdate'); self.online = False; date = True
-    if cfg.has_option('scan', 'edate'):   self.efolder = cfg.get('scan', 'edate'); self.online = False
+
     for opt, arg in opts:
-      if   opt in ("-h", "--help"):        Usage()
-      elif opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
-      elif opt in ("-n", "--nf"):          self.nfile     = int(arg)
-      elif opt in ("-d", "--folder"):      self.folder    = arg;      self.online = False #; date = True
-      elif opt in ("-e", "--efolder"):     self.efolder   = arg;      self.online = False
-      elif opt in ("-f", "--file"):        self.filename  = arg;      self.online = False
-      elif opt in ("-t", "--time"):        self.tfrom     = int(arg); self.online = False #; time = True
-      elif opt in ("-k", "--keV"):         self.tokeV     = False
-      elif opt in ("-s", "--scale"):       self.scalefile = arg;  
-      elif opt in ("-c", "--cfg"):         self.cfg_file  = arg;  
-      elif opt in ("-v", "--verify"):      self.verify    = True;     self.energy = float(arg);  
-      elif opt in ("-l", "--list"):        self.listonly  = True
-      elif opt in (      "--edge"):        self.edge      = True;     self.tokeV  = False
-      elif opt in (      "--escan"):       self.escan     = True;     self.online = False
+      if   opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
+      elif opt in ("-n", "--nf")         : self.nfile     = int(arg)
+      elif opt in ("-d", "--folder")     : self.folder    = arg;      self.online = False
+      elif opt in ("-e", "--efolder")    : self.efolder   = arg;      self.online = False
+      elif opt in ("-f", "--file")       : self.filename  = arg;      self.online = False
+      elif opt in ("-t", "--time")       : self.tfrom     = int(arg); self.online = False
+      elif opt in ("-k", "--keV")        : self.tokeV     = False
+      elif opt in ("-s", "--scale")      : self.scalefile = arg;  
+      elif opt in ("-v", "--verify")     : self.verify    = True;     self.energy = float(arg);  
+      elif opt in ("-l", "--list")       : self.listonly  = True
+      elif opt in (      "--edge")       : self.edge      = True;     self.tokeV  = False
+      elif opt in (      "--escan")      : self.escan     = True
+      elif opt in ("-c", "--cfg")        :
+        self.cfg_file  = arg;  
+        cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
+        if cfg.has_option('scale', 'file') and not ("-s"  in opts) and not ("--scale"   in opts): 
+          self.scalefile = cfg.get('scale', 'file'); self.online = False
+        if cfg.has_option('scan', 'bdate') and not ("-d"  in opts) and not ("--folder"  in opts):
+          self.folder = cfg.get('scan', 'bdate');    self.online = False
+        if cfg.has_option('scan', 'edate') and not ("-e"  in opts) and not ("--efolder" in opts):
+          self.efolder = cfg.get('scan', 'edate');   self.online = False
 
   def GetList(self):
     fold_list, file_list = [], []
@@ -128,16 +133,15 @@ class Histogram:
   hps      = ROOT.TH1I('hps','',nbins, 0, nbins)
 
   def __init__(self,todo):
-    self.nfile, self.prompt = todo.nfile, todo.prompt
-    self.tokeV, self.orig, self.EME    = todo.tokeV, todo.orig, todo.edge
+    self.nfile, self.prompt, self.tokeV = todo.nfile, todo.prompt, todo.tokeV
     cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
     if cfg.has_option('scale', 'cdif'):  self.cdif = cfg.getfloat('scale', 'cdif')
     else:                                self.cdif = 0.01
-    if   self.EME and 'BEPC' in todo.orig:
-      try:                from bepc.bepc import EDGE;      self.EME = EDGE(todo.scalefile, todo.cfg_file)
+    if   todo.edge and 'BEPC'   in todo.orig:
+      try: from bepc.bepc     import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'BEPC is not yet implemented'; exit(0)
-    elif self.EME and  'VEPP2K' in todo.orig:
-      try:                from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
+    elif todo.edge and 'VEPP2K' in todo.orig:
+      try: from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'V2K is not yet implemented'; exit(0)
     if self.tokeV: 
       from scale.isotopes import Isotopes
@@ -177,16 +181,16 @@ class Histogram:
       self.sname += time.strftime(' %H:%M:%S] %Y.%m.%d.', time.localtime(self.UTE))
       self.sname += ' Live-time: %d hours %d min %d s (%d files).' % (H, M, S, n)
       self.hps.SetNameTitle('hps',self.sname);  self.hps.SetEntries(self.hps.Integral());  self.hps.SetLineColor(ROOT.kBlack)
-      if self.tokeV: self.CALIBRATION.Do(self.UTB, self.UTE, DATA.PB5, self.hps, ptype)
+      if self.tokeV: 
+        R = self.CALIBRATION.Do(self.UTB, self.UTE, DATA.PB5, self.hps, ptype)
       elif self.EME: 
         R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain)
-        if self.prompt: raw_input('Press <Enter> to proceed')
-        return R
       else:
+        R = 0 
         self.hps.GetXaxis().SetTitle('E_{#gamma}, channels')
         self.cv.cd(); self.cv.SetGrid(); self.hps.Draw('HIST'); self.cv.Modified(); self.cv.Update()
       if self.prompt: raw_input('Press <Enter> to proceed')
-    return 0
+    return R
 
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -234,19 +238,19 @@ class DataFile:
 def main(argv):
   todo  = ToDo()
   flist = todo.GetList()
-  if todo.escan:
-    from bepc.energy_scan import Energy_Scan
-    InTime = Energy_Scan()
-    InTime.Go(flist,todo)
-  elif todo.verify:
-    from scale.isotopes import Isotopes
-    InTime = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
-    InTime.Check_Scale(todo.energy)
-  else:
-    SP = Histogram(todo)
-    try:
+  try:
+    if todo.escan:
+      from bepc.energy_scan import Energy_Scan
+      A = Energy_Scan()
+      A.Go(flist,todo)
+    elif todo.verify:
+      from scale.isotopes import Isotopes
+      A = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
+      A.Check_Scale(todo.energy, todo.prompt)
+    else:
+      A = Histogram(todo)
       while True:
-        SP.Go(flist)
+        A.Go(flist)
         while todo.online:
           time.sleep(15.0)
           flist=todo.GetList()
@@ -256,8 +260,11 @@ def main(argv):
         else:
           break
       raw_input('All done. <Enter> to quit.')
-    except KeyboardInterrupt: print '\nExecution is interrupted'
-  
+  except KeyboardInterrupt: print '\nExecution is interrupted'
+  if hasattr(A, 'cfh'):           A.cfh.cd();              A.cfh.Clear()
+  if hasattr(A, 'CALIBRATION'):   A.CALIBRATION.cv.cd();   A.CALIBRATION.cv.Clear()
+  if hasattr(A, 'EME'):           A.EME.cv.cd();           A.EME.cv.Clear()
+  if hasattr(A, 'cv'):            A.cv.cd();               A.cv.Clear()
   exit()
   
 

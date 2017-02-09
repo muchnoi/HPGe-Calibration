@@ -26,8 +26,8 @@ class EDGE:
     self.const   = ROOT.TF1('const', '[0]')
     self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7); self.simple.SetLineColor(ROOT.kRed)
     self.comple  = ROOT.TF1('comple', EdgeComple(), 0, 1, 9); self.comple.SetLineColor(ROOT.kAzure)
-    self.Lg1     = ROOT.TLegend(0.55, 0.81, 0.98, 0.91, '', 'brNDC'); 
-    self.Lg2     = ROOT.TLegend(0.55, 0.69, 0.98, 0.79, '', 'brNDC'); 
+    self.Lg1     = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC'); 
+    self.Lg2     = ROOT.TLegend(0.55, 0.49, 0.98, 0.69, '', 'brNDC'); 
     self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -79,8 +79,9 @@ class EDGE:
       print ' ║         χ2/NDF = %5.1f/%3d               │         Probability: %5.3f                ║' % (E['Chi2'], E['NDF'],Prob)
       print ' ╚══════════════════════════════════════════╧═══════════════════════════════════════════╝\n'
       OK = (E['p0']>self.MinAmp) and (E['dp0']/E['p0']<1.0) and (E['Chi2']/E['NDF']<10.0) and (E['p2']<100.0)
-      self.Lg1.Clear(); self.Lg1.SetHeader('#chi^{2}/NDF = %5.1f/%3d' % (E['Chi2'], E['NDF']))
-      self.Lg1.AddEntry(self.simple, '#omega_{max} = %.2f #pm %.2f keV' % (E['p1'], E['dp1']), 'l')
+      self.Lg1.Clear(); self.Lg1.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (E['Chi2'], E['NDF'], Prob))
+      self.Lg1.AddEntry(self.simple, '#omega_{max}  = %7.2f #pm %4.2f keV' % (E['p1'], E['dp1']), 'l')
+      self.Lg1.AddEntry(self.simple, '#sigma_{edge} = %7.2f #pm %4.2f keV' % (E['p2'], E['dp2']), 'l')
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
     self.hps.Draw(''); self.hps.GetXaxis().SetRangeUser(E1, E2); self.simple.Draw('SAME')
     self.Lg1.Draw('SAME'); self.cc.Modified(); self.cc.Update()
@@ -120,8 +121,10 @@ class EDGE:
     print ' ║         χ2/NDF = %5.1f/%3d               │         Probability: %5.3f                ║' % (Ec['Chi2'], Ec['NDF'], Prob)
     print ' ╚══════════════════════════════════════════╧═══════════════════════════════════════════╝\n'
 
-    self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d' % (Ec['Chi2'], Ec['NDF']))
-    self.Lg2.AddEntry(self.comple, '#omega_{max} = %.2f #pm %.2f  keV' % (Ec['p1'], Ec['dp1']), 'l')
+    self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (Ec['Chi2'], Ec['NDF'], Prob))
+    self.Lg2.AddEntry(self.comple, '#omega_{max} =  %7.2f #pm %4.2f keV' % (Ec['p1'], Ec['dp1']), 'l')
+    self.Lg2.AddEntry(self.comple, '#sigma_{R} = %5.2f keV;  #sigma_{L} = %5.2f keV' % (self.RR, self.RL), 'l')
+    self.Lg2.AddEntry(self.comple, '#sigma_{beam} = %7.2f #pm %4.2f keV' % (Ec['p2'], Ec['dp2']), 'l')
     self.comple.DrawCopy('SAME'); self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
 
     print ' Wmax: %7.2f ± %4.2f keV (symmetric fit)'      % (E['p1'], E['dp1'])

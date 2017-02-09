@@ -32,7 +32,7 @@ class Energy_Scan:
           TABLE['Se'].append( Se); TABLE['Sp'].append(Sp)
       else: print "bad records in %s (acq. time is %d s)" % (f, 2*dt)
 
-    self.ct = ROOT.TCanvas('ct','Files history', 2, 2, 1002, 1002);  self.ct.Divide(1,2)
+    self.cfh = ROOT.TCanvas('cfh','Files history', 2, 2, 1002, 1002);  self.cfh.Divide(1,2)
     self.Show_Points(TABLE);   raw_input('All good points...')
 
     n, PointN = 0, 0
@@ -74,12 +74,12 @@ class Energy_Scan:
 
     raw_input( '%d energy scan points have been founded' % PointN )
 
+    self.H = Histogram(todo)
     for PointN in range(len(Energy_Points)):
       print '\nPoint %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
-      S = Histogram(todo)
       if todo.edge:
-        flist = [el for el in Energy_Points[PointN] if 'elec' in el]; S.nfile = len(flist); E = S.Go(flist)
-        flist = [el for el in Energy_Points[PointN] if 'posi' in el]; S.nfile = len(flist); P = S.Go(flist)
+        flist = [el for el in Energy_Points[PointN] if 'elec' in el]; self.H.nfile = len(flist); E = self.H.Go(flist)
+        flist = [el for el in Energy_Points[PointN] if 'posi' in el]; self.H.nfile = len(flist); P = self.H.Go(flist)
         if E and P:
           tmin, tmax = min(E[0] - E[1], P[0] - P[1]), max(E[0] + E[1], P[0] + P[1])
           t   , dt      = 0.5*(tmin + tmax), 0.5*(tmax - tmin)
@@ -93,7 +93,7 @@ class Energy_Scan:
           with open('SCAN.results','a') as f: f.write(outs)
 #        raw_input('Point %d energy measurement is ready' % PointN)
       else:  
-        flist = [el for el in Energy_Points[PointN]];                 S.nfile = len(flist);  S.Go(flist)
+        flist = [el for el in Energy_Points[PointN]];  self.H.nfile = len(flist);  self.H.Go(flist)
         print 'Point %d scale calibration is ready (porridge)'  % PointN
 #        flist = [el for el in Energy_Points[PointN] if 'elec' in el]; S.nfile = len(flist);  S.Go(flist)
 #        print 'Point %d scale calibration is ready (electrons)' % PointN
@@ -134,8 +134,8 @@ class Energy_Scan:
     self.GSE = GSE
     self.GSP = GSP
 
-    self.ct.cd(1); self.ct.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME'); 
-    self.ct.cd(2); self.ct.SetGrid(); self.GSE.Draw('APL'); self.GSP.Draw('PLSAME'); 
+    self.cfh.cd(1); self.cfh.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME'); 
+    self.cfh.cd(2); self.cfh.SetGrid(); self.GSE.Draw('APL'); self.GSP.Draw('PLSAME'); 
     
-    self.ct.Modified(); self.ct.Update()  
+    self.cfh.Modified(); self.cfh.Update()  
     

@@ -97,10 +97,9 @@ class EDGE:
     S = E['p2']**2 - self.RR**2; S = 1.0 if S<0.0 else S**0.5 # estimated influence of beam energy spread to the edge width
     
     Ebeam = self.BEPC[self.lepton]['E'] # MeV
-    if self.Asymme<1.0: SL = self.RL
-    else:   SL = self.Asymme*self.RR
+    if self.Asymme>=1.0: self.RL = self.Asymme*self.RR
     # Amplitude | Position | Sigma | edge tilt ~x | edge tilt ~x^2 | Background | Background Slope | Sigma_R | Sigma_L |
-    self.comple.SetParameters(E['p0'], E['p1'], S, E['p3'], E['p4'], E['p5'], E['p6'], self.RR, SL);
+    self.comple.SetParameters(E['p0'], E['p1'], S, E['p3'], E['p4'], E['p5'], E['p6'], self.RR, self.RL);
     FIXED = [5,6,7,8]; 
     for n in FIXED: V = self.comple.GetParameter(n); self.comple.FixParameter(n,V)
     R = self.hps.Fit('comple','RSQN')

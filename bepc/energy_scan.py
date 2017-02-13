@@ -53,8 +53,8 @@ class Energy_Scan:
       print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
 
 # Clear TABLE
-    p, np = 0, len(Energy_Points)
-    while p < np:
+    p, tnp = 0, len(Energy_Points)
+    while p < tnp:
       Ne = len([fn for fn in Energy_Points[p] if 'elec' in fn])
       Np = len([fn for fn in Energy_Points[p] if 'posi' in fn])
       if len(Energy_Points[p]) < 3 or not (Ne and Np):
@@ -62,7 +62,7 @@ class Energy_Scan:
           rem_rec = TABLE['file'].index(el)
           for key in TABLE.keys(): TABLE[key].pop(rem_rec)
         Energy_Points.pop(p);      Points_Names.pop(p)
-        np -= 1
+        tnp -= 1
       else:
         p += 1
     
@@ -75,12 +75,14 @@ class Energy_Scan:
     raw_input( '%d energy scan points have been founded' % PointN )
 
     self.H = Histogram(todo)
+    Bs_elec, Bs_posi = [], []    
     for PointN in range(len(Energy_Points)):
       print '\nPoint %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
       if todo.edge:
         flist = [el for el in Energy_Points[PointN] if 'elec' in el]; self.H.nfile = len(flist); E = self.H.Go(flist)
         flist = [el for el in Energy_Points[PointN] if 'posi' in el]; self.H.nfile = len(flist); P = self.H.Go(flist)
         if E and P:
+          Bs_elec.append(E[4]);   Bs_posi.append(P[4])
           tmin, tmax = min(E[0] - E[1], P[0] - P[1]), max(E[0] + E[1], P[0] + P[1])
           t   , dt      = 0.5*(tmin + tmax), 0.5*(tmax - tmin)
           E_cms, dE_cms = self.IP * (E[2]*P[2])**0.5, (E[3]**2 + P[3]**2)**0.5
@@ -95,13 +97,18 @@ class Energy_Scan:
       else:  
         flist = [el for el in Energy_Points[PointN]];  self.H.nfile = len(flist);  self.H.Go(flist)
         print 'Point %d scale calibration is ready (porridge)'  % PointN
-#        flist = [el for el in Energy_Points[PointN] if 'elec' in el]; S.nfile = len(flist);  S.Go(flist)
-#        print 'Point %d scale calibration is ready (electrons)' % PointN
-#        flist = [el for el in Energy_Points[PointN] if 'posi' in el]; S.nfile = len(flist);  S.Go(flist)
-#        print 'Point %d scale calibration is ready (positrons)' % PointN
-
-#        raw_input()
+    
+    if todo.edge:
+      Se = np.fromiter(Bs_elec, np.float)
+      Sp = np.fromiter(Bs_posi, np.float)
+      outs  = '# The beam energy spreads averaged over the scan points:\n'
+      outs += "# e- beam spread = %.0f ± %.0f keV\n" % (Se.mean(), Se.std())
+      outs += "# e+ beam spread = %.0f ± %.0f keV\n" % (Sp.mean(), Sp.std())
+      with open('SCAN.results','a') as f: f.write(outs)
       
+
+
+        
     raw_input('So what?')  
 
 

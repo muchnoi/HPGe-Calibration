@@ -506,7 +506,12 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       g.GetXaxis().SetTimeDisplay(1); g.GetXaxis().SetTimeFormat(TF); g.GetXaxis().SetLabelOffset(0.03)
       g.GetYaxis().SetDecimals();     g.GetYaxis().SetTitle('keV');   g.GetYaxis().SetTitleOffset(1.2)
 
-    cs.Modified(); cs.Update(); raw_input('Have a look, then press <Enter> to exit.')
+    cs.Modified(); cs.Update()
+    print 'Average energy      = %8.3f ± %8.3f keV' % (e1.GetMean(2), e1.GetRMS(2))
+    print 'Average correction  = %8.3f ± %8.3f keV' % (e2.GetMean(2), e2.GetRMS(2))
+    print 'Average right sigma = %8.3f ± %8.3f keV' % (e3.GetMean(2), e3.GetRMS(2))
+    print 'Average left  sigma = %8.3f ± %8.3f keV' % (e4.GetMean(2), e4.GetRMS(2))
+    raw_input('Have a look, then press <Enter> to exit.')
     self.cv.cd(); self.cv.Clear(); self.cv.Modified(); self.cv.Update() # This is to prevent segmentation fault on exit()
 
     

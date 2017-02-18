@@ -407,7 +407,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
     OD = {'T':[], 'dT':[], 'Z':[], 'G':[], 'N':[], 'dW':[], 'C':[], 'dC':[], 'R':[], 'dR':[], 'L':[], 'dL':[]}
     f, CARE  = ROOT.TFile(self.outfile), ROOT.TList()
-    print 'Get calibration from: ', self.outfile  
+#    print 'Get calibration from: ', self.outfile  
     for el in [el.GetName() for el in f.GetListOfKeys()]:
       utb, ute, ptype = eval(el)
       if t==0 or utb<t<ute: 

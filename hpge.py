@@ -128,9 +128,11 @@ class ToDo:
 class Histogram:
   nbins    = 16384   # number of bins in a histogram
   tmin     = 100.0   # minimum data acquisition time for one file , s
-  ROOT.gROOT.SetStyle("Plain"); ROOT.gROOT.ForceStyle()
+  EME      = False
+  ROOT.gROOT.SetStyle("Plain");       ROOT.gROOT.ForceStyle()
   ROOT.gStyle.SetTitleBorderSize(0);  ROOT.gStyle.SetOptStat(0);    ROOT.gStyle.SetOptFit(0)
   hps      = ROOT.TH1I('hps','',nbins, 0, nbins)
+
 
   def __init__(self,todo):
     self.nfile, self.prompt, self.tokeV = todo.nfile, todo.prompt, todo.tokeV
@@ -141,6 +143,7 @@ class Histogram:
       try: from bepc.bepc     import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'BEPC is not yet implemented'; exit(0)
     elif todo.edge and 'VEPP2K' in todo.orig:
+      ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
       try: from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'V2K is not yet implemented'; exit(0)
     if self.tokeV: 
@@ -240,9 +243,13 @@ def main(argv):
   flist = todo.GetList()
   try:
     if todo.escan:
-      from bepc.energy_scan import Energy_Scan
-      A = Energy_Scan()
-      A.Go(flist,todo)
+      if 'BEPC' in todo.orig:
+        from bepc.energy_scan import Energy_Scan
+        A = Energy_Scan()
+        A.Go(flist,todo)
+      else:
+        print 'Is this data from BEPC?'
+        exit()
     elif todo.verify:
       from scale.isotopes import Isotopes
       A = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
@@ -261,10 +268,10 @@ def main(argv):
           break
       raw_input('All done. <Enter> to quit.')
   except KeyboardInterrupt: print '\nExecution is interrupted'
-  if hasattr(A, 'cfh'):           A.cfh.cd();              A.cfh.Clear()
-  if hasattr(A, 'CALIBRATION'):   A.CALIBRATION.cv.cd();   A.CALIBRATION.cv.Clear()
-  if hasattr(A, 'EME'):           A.EME.cv.cd();           A.EME.cv.Clear()
-  if hasattr(A, 'cv'):            A.cv.cd();               A.cv.Clear()
+  if hasattr(A, 'cfh'):             A.cfh.cd();              A.cfh.Clear()
+  if hasattr(A, 'CALIBRATION'):     A.CALIBRATION.cv.cd();   A.CALIBRATION.cv.Clear()
+  if hasattr(A, 'EME'):             A.EME.cc.cd();           A.EME.cc.Clear()
+  if hasattr(A, 'cv'):              A.cv.cd();               A.cv.Clear()
   exit()
   
 

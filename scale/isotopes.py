@@ -77,7 +77,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     if self.nScalePeaks>2:
       for iteration in range(self.nitr):
         self.fitPeaks(L = self.fitL, R = self.fitR)
-        self.Do_Energy_Scale(); self.Show_Energy_Scale()
+        self.Do_Energy_Scale(); 
+        self.Show_Energy_Scale()
       self.ShowScale(1)
       self.PeaksTable() 
       self.Show_Energy_Resolution(self.Do_Energy_Resolution())
@@ -229,7 +230,6 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
       self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
 
-
 # 3) PULSER AMPLITUDES LINEAR CORRECTION
     if self.PB5:
       R, n = ROOT.TGraphErrors(), 0 
@@ -240,7 +240,6 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       for pk in self.PulsePeaks: pk['E'] = (p0-k0+(1.+p1)*pk['E'])/(1.+k1)
       self.zero_p = (p0 - k0 + (1.+p1)*self.zero_p)/(1. + k1);   self.gain_p *= (1. + p1)/(1. + k1)
       del R
-
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -416,7 +415,11 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         N,X,Y,dX,dY = [],[],[],[],[]
         
         for G in [CARE[1], CARE[2], CARE[3], CARE[4]]:
-          N.append(G.GetN()); X.append(G.GetX()); dX.append(G.GetEX()); Y.append(G.GetY()); dY.append(G.GetEY())
+          Np = G.GetN(); N.append(Np); 
+          X.append( [ G.GetX()[n] for n in range(Np)]); 
+          dX.append([G.GetEX()[n] for n in range(Np)]); 
+          Y.append( [ G.GetY()[n] for n in range(Np)]); 
+          dY.append([G.GetEY()[n] for n in range(Np)])
                   
         # 1. Linear Scale Calibration
         self.S0.Set(N[0])
@@ -561,9 +564,10 @@ def fitParameters(fitf):
 def MultiGraphLimits(mg):
   X,Y,eY = [],[],[]
   for g in mg.GetListOfGraphs():
-    for el in  g.GetX():  X.append(el)
-    for el in  g.GetY():  Y.append(el)
-    for el in g.GetEY(): eY.append(el)
+    for n in range(g.GetN()):
+      X.append(g.GetX()[n])
+      Y.append(g.GetY()[n])
+      eY.append(g.GetEY()[n])
   return min(X)-100, max(X)+100, min(Y)-2*max(eY), max(Y)+2*max(eY)
 
 

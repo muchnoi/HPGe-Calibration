@@ -62,7 +62,9 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[2])
     self.InitGraphics()    
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def __del__(self):    Atlas.__del__(self)
+  def __del__(self):    
+    Atlas.__del__(self); 
+    self.cv.cd(); self.cv.Clear() 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Do(self, utb, ute, pb5, hps, ptype):

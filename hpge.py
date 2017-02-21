@@ -127,12 +127,11 @@ class ToDo:
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class Histogram:
   nbins    = 16384   # number of bins in a histogram
-  tmin     = 100.0   # minimum data acquisition time for one file , s
+  tmin     = 10.0    # minimum data acquisition time for one file , s
   EME      = False
   ROOT.gROOT.SetStyle("Plain");       ROOT.gROOT.ForceStyle()
   ROOT.gStyle.SetTitleBorderSize(0);  ROOT.gStyle.SetOptStat(0);    ROOT.gStyle.SetOptFit(0)
   hps      = ROOT.TH1I('hps','',nbins, 0, nbins)
-
 
   def __init__(self,todo):
     self.nfile, self.prompt, self.tokeV = todo.nfile, todo.prompt, todo.tokeV
@@ -268,10 +267,7 @@ def main(argv):
           break
       raw_input('All done. <Enter> to quit.')
   except KeyboardInterrupt: print '\nExecution is interrupted'
-  if hasattr(A, 'cfh'):             A.cfh.cd();              A.cfh.Clear()
-  if hasattr(A, 'CALIBRATION'):     A.CALIBRATION.cv.cd();   A.CALIBRATION.cv.Clear()
-  if hasattr(A, 'EME'):             A.EME.cc.cd();           A.EME.cc.Clear()
-  if hasattr(A, 'cv'):              A.cv.cd();               A.cv.Clear()
+  del A
   exit()
   
 

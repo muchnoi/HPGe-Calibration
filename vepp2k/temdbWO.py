@@ -1,6 +1,5 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
 """
 Я завел следующие поля в базе:
 /EMS/DT
@@ -13,10 +12,7 @@
 Пакет в аттаче. Я добавил также простой "replace" -- работать будет только если время совпадает в точности.  Время передается либо в
 time.time_struct либо float либо int (последние 2 -- секунды от 1970 г.).
 """
-
-import sys
-import MySQLdb
-import time
+import sys, time, MySQLdb
 
 def message(m):
     sys.stderr.write(str(m)+"\n")
@@ -26,40 +22,29 @@ def normalize(name):
     return "/"+"/".join(list)
 
 def timeToMks(t):
-    if isinstance(t, float) or isinstance(t, int) or isinstance(t, long):
-        return int(t*1000000)
-    elif isinstance(t, time.struct_time):
-        return int(mktime(t)*1000000)
-    else:
-        raise AttributeError("wrong type of time: (%s) %s"%(type(t),t))
+    if isinstance(t, float) or isinstance(t, int) or isinstance(t, long):  return int(t*1000000)
+    elif isinstance(t, time.struct_time):                                  return int(mktime(t)*1000000)
+    else:                                                                  raise AttributeError("wrong type of time: (%s) %s"%(type(t),t))
 
-queryName = "select c.c_id, c.c_type from t_entry e, t_domain d, t_channel c "+\
-            "where e.c_channel=c.c_id and e.c_parent=d.c_id and d.c_path=%s and e.c_name=%s"
+queryName = "select c.c_id, c.c_type from t_entry e, t_domain d, t_channel c where e.c_channel=c.c_id and e.c_parent=d.c_id and d.c_path=%s and e.c_name=%s"
 
 class Registry(object):
 
     def __init__(self, storage):
-        self.storage  = storage
-        self.registry = { }
+        self.storage  = storage;        self.registry = { }
 
     def registerChannel(self, name):
         if name in self.registry: raise KeyError(name)
         channel = Channel(name, self.storage.connection)
-        if channel.id == None:
-            # could not obtain channel by name
-            raise KeyError(name)
+        if channel.id == None:    raise KeyError(name)  # could not obtain channel by name
         self.registry[name] = channel
-
         return channel
 
-    def __call__(self, name):
-        return self.registry[name]
+    def __call__(self, name):      return self.registry[name]
 
-    def __contains__(self, name):
-        return name in self.registry
+    def __contains__(self, name):  return name in self.registry
 
-    def __iter__(self):
-        return iter(self.registry)
+    def __iter__(self):            return iter(self.registry)
 
     def __getitem__(self, name):
         if not name in self.registry: raise KeyError(name)

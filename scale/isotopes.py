@@ -438,6 +438,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
           R = U.Fit('lipc','QNRS')
           R.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, True); dc = er[0]
           del U
+        else:
+          self.PB5, c, dc = False, 0.0, 0.0
 
         self.Show_Energy_Scale()
 

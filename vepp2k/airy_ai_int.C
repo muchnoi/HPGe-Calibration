@@ -1,5 +1,4 @@
 #include <memory>
-
 #include "Math/SpecFunc.h"
 #include "Math/WrappedFunction.h"
 #include "Math/Integrator.h"
@@ -38,3 +37,5 @@ double airy_ai_int(const double *xx, const double *)
 
   return 1.0/3.0 - spline->Eval(xx[0]);
 }
+
+

@@ -22,7 +22,9 @@ class EDGE(Constants):
     self.MinAmp  = cfg.getfloat('edge', 'MinAmpEdge')
     self.Ranger  = cfg.getfloat('edge', 'EdgeRanger')
     self.Merger  =   cfg.getint('edge', 'BinsMerger')
-    self.ETuner  = cfg.getfloat('edge', 'EbepcTuner')
+    self.ETuner  = cfg.getfloat('edge', 'EveppTuner')
+    self.BTuner  = cfg.getfloat('edge', 'BveppTuner')
+    self.Radius  = cfg.getfloat('edge', 'VeppRadius')
     self.Asymme  = cfg.getfloat('edge', 'Asymmetry')
     lwave        = cfg.getfloat('edge', 'WaveLength')       # laser wavelength [m]
     Constants.wo = Constants.h*Constants.c/lwave            # laser photon energy [eV]
@@ -45,9 +47,12 @@ class EDGE(Constants):
   def Go(self, UTB, UTE, hps, filechain):
     self.VEPP2K = VEPP2K_DB().GetRunInfo(filechain)
     if self.VEPP2K:
-      self.Eo = self.VEPP2K['E'] + self.ETuner           # [MeV]
-      k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
-      Wmax = 1.e+3*self.Eo*k/(1.+k)                      # [keV]
+      if abs(self.ETuner)<10.0: self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
+      else:                     self.Eo = self.ETuner                           # [MeV]
+      if self.Radius:           self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T] 
+      else:                     self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
+      k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2;                        # [eV*eV / eV**2]
+      Wmax = 1.e+3*self.Eo*k/(1.+k)                                             # [keV]
       zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
       if gain:
         self.hps = hps.Clone(); nbins = hps.GetNbinsX();    self.hps.GetXaxis().SetTitle('E_{#gamma}, keV')
@@ -65,14 +70,17 @@ class EDGE(Constants):
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeSimple(self,W,LBK):
     
-    K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin
+    K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
     self.const.SetRange(1.02*W, E2); self.hps.Fit('const','QRN');  B = self.const.GetParameter(0)
     self.const.SetRange(E1, 0.98*W); self.hps.Fit('const','QRN');  A = self.const.GetParameter(0) - B
     # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |  
-    params = numpy.fromiter([self.Eo,  self.VEPP2K['B'], A, 0.0, 0.0, B, 0.0], numpy.float)
+    params = numpy.fromiter([self.Eo,  self.Bo, A, 0.0, 0.0, B, 0.0], numpy.float)
     self.simple.SetParameters(params); self.simple.SetRange(E1, E2); self.simple.SetNpx(1000)
 
+    if self.Radius: self.simple.FixParameter(1,self.Bo)
     R = self.hps.Fit('simple','RSQN'); OK = False
+    if self.Radius: self.simple.ReleaseParameter(1)
+
     if not R.Status():
       E = fitParameters(self.simple)
       tilt = (1e+3*E['p'][3], 1e+3*E['e'][3], 1e+6*E['p'][4], 1e+6*E['e'][4])
@@ -100,7 +108,7 @@ class EDGE(Constants):
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self,W,LBK):
     
-    K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin
+    K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
     cnvl = ROOT.TF1Convolution('simple', 'spreso'); cnvl.SetNofPointsFFT(1000)
     self.comple = ROOT.TF1('comple',cnvl,E1,E2,10);   self.comple.SetNpx(1000)
     self.simple.SetLineColor(ROOT.kBlue);  self.comple.SetLineColor(ROOT.kRed)
@@ -108,8 +116,10 @@ class EDGE(Constants):
     self.comple.SetParameters(numpy.fromiter(p, numpy.float))
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
 
+    if self.Radius: self.comple.FixParameter(1,self.Bo)
     self.comple.FixParameter(7,self.RR);  self.comple.FixParameter(8,self.RL)
     R = self.hps.Fit('comple','RSQN');    OK = False
+    if self.Radius: self.comple.ReleaseParameter(1)
     self.comple.ReleaseParameter(7);      self.comple.ReleaseParameter(8)
 
     if not R.Status():
@@ -141,7 +151,7 @@ class EDGE(Constants):
       k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
 #    if offline: raw_input('Bad Fit?')
-    print 'Simple fit: bad fit, bad amplitude, spread or χ2';  return 0.0
+    print 'Complex fit: bad fit, bad amplitude, spread or χ2';  return 0.0
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def GetCalibrationResults(self, t, wmax):
@@ -155,7 +165,9 @@ class EDGE(Constants):
     Quality = []
     for c in range(len(Scale['T'])):
       Quality.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
-    if len(Quality)==0:   print 'No valid calibration was found'
+    if len(Quality)==0:   
+      print 'No valid calibration was found'
+      return 0,0
     c = Quality.index(min(Quality))
     zero, gain         = Scale['Z'][c], Scale['G' ][c]
     self.dW            =                Scale['dW'][c] # linear calibration statistical error, keV
@@ -167,7 +179,6 @@ class EDGE(Constants):
     print ' ║  W_max  = %9.3f keV  │   σR = %6.3f ± %5.3f keV  │   σL = %6.3f ± %5.3f keV    ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
     print ' ╚══════════════════════════╧════════════════════════════╧══════════════════════════════╝\n'
     return zero, gain  
-    
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

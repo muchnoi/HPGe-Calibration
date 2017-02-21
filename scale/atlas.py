@@ -58,7 +58,7 @@ class Atlas:
 
     
 # The following were measured by using the previous to calibrate HPGe
-    self.atlas['Ac228']   =   [{'Key':'0', 'W': 911.282, 'dW':.004, 'CC':False,  'RC':True, 'Compton':.0099 }]
+#    self.atlas['Ac228']   =   [{'Key':'0', 'W': 911.282, 'dW':.004, 'CC':False,  'RC':False, 'Compton':.0099 }]
 #    self.atlas['Ac228'].append({'Key':'1', 'W': 964.799, 'dW':.010, 'CC':False,  'RC':True })
 
     self.atlas['Tl208'] = []

@@ -108,86 +108,56 @@ class Storage(object):
                                             db     = db,
                                             port   = port)
         self.connection.autocommit(True)
-
         # message("connection messages: %s"%self.connection.messages)
         self.registry     = Registry(self)
-
         self.newstamp     = None
         self.oldstamp     = None
 
-    def ping(self, reconnectFlag = False):
-        return self.connection.ping(reconnectFlag)
+    def ping(self, reconnectFlag = False): return self.connection.ping(reconnectFlag)
 
-    def channel(self, name):
-        return self.registry(name)
+    def channel(self, name):               return self.registry(name)
 
     def prepareQueues(self):
-        queueD = [ ]
-        queueI = [ ]
+        queueD, queueI = [], []
         for name in self:
             channel = self.channel(name)
             if not channel.modified: continue
-            if channel.stype==0:
-                queueI.append(channel)
-            else:
-                queueD.append(channel)
-
+            if channel.stype==0: queueI.append(channel)
+            else:                queueD.append(channel)
         return queueD, queueI
 
     def replace(self, t):
         self.newstamp = timeToMks(t)
-
         queueD, queueI = self.prepareQueues()
         if len(queueD)==0 + len(queueI)==0:
-            message("nothing to replace")
-            return
-
-        self.queries = \
-                     self.generateReplace(queueD, "double") + \
-                     self.generateReplace(queueI, "integer")
-
+            message("nothing to replace");  return
+        self.queries = self.generateReplace(queueD, "double") + self.generateReplace(queueI, "integer")
         self.execute()
 
     def insert(self, t):
         self.newstamp = timeToMks(t)
-
         queueD, queueI = self.prepareQueues()
         if len(queueD)==0 + len(queueI)==0:
-            message("nothing to save")
-            return
-
-        self.queries = [ self.generateInsert(queueD, "double"),
-                         self.generateInsert(queueI, "integer"), ]
-
+            message("nothing to save");            return
+        self.queries = [self.generateInsert(queueD, "double"), self.generateInsert(queueI, "integer"),]
         self.execute()
 
     def execute(self):
-
         self.connection.autocommit(False)
-
         cursor = self.connection.cursor()
-
         for q in self.queries:
-            if q != None:
+            if q != None: cursor.execute(q)
 #              message("execute: %s"%q)
-              cursor.execute(q)
-
         self.connection.commit()
         self.connection.autocommit(True)
-
         cursor.close()
-
         self.oldstamp = self.newstamp
-
         for name in self:
             channel = self.channel(name)
-            if channel.modified:
-                channel.modified = False
+            if channel.modified: channel.modified = False
 
     def generateInsert(self, queue, table):
-
         if len(queue)<1: return None
-
         q     = "INSERT INTO t_data%s VALUES"%table
         space = " "
         for channel in queue:
@@ -200,38 +170,28 @@ class Storage(object):
     def generateReplace(self, queue, table):
         result = [ ]
         if len(queue)<1: return result
-   
         q = "UPDATE t_data%s SET c_value='%%s' where c_channel='%%d' and c_stamp='%%d';"%table
-        for channel in queue:
-            result.append( q % (channel.datum, channel.id, self.newstamp) )
+        for channel in queue:  result.append( q % (channel.datum, channel.id, self.newstamp) )
         return result
 
     def register(self, name0):
-        name = normalize(name0)
-        channel = self.registry.registerChannel(name)
-        return channel
+        name = normalize(name0); channel = self.registry.registerChannel(name);  return channel
 
-    def __delitem__(self, name):
-        self.unregister(name, True)
+    def __delitem__(self, name):        self.unregister(name, True)
 
     def unregister(self, name0, silent = False):
-        name = normalize(name0)
-        del self.registry[name]
+        name = normalize(name0);        del self.registry[name]
 
     def __getitem__(self, name0):
-        name = normalize(name0)
-        return self.registry[name]
+        name = normalize(name0);        return self.registry[name]
 
     def __setitem__(self, name0, value):
-        name = normalize(name0)
-        self.registry[name] = value
+        name = normalize(name0);        self.registry[name] = value
 
     def __contains__(self, name0):
-        name = normalize(name0)
-        return name in self.registry
+        name = normalize(name0);        return name in self.registry
 
-    def __iter__(self):
-        return iter(self.registry)
+    def __iter__(self):        return iter(self.registry)
 
 if __name__ == "__main__" :
     import time

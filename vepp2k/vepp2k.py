@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 import ROOT, numpy, cPickle, os, time, ConfigParser
-from hpge import DataFile, Histogram
 from scale.isotopes  import Isotopes
-from temdbWO import  Storage
+sql = True
+try: 
+  from temdbWO import Storage
+except ImportError:
+  sql = False 
+  print 'database is unavailable'
 
 class Constants:
-  c    = 299792458        # speed of light          [m/s]
+  c    = 299792458.0      # speed of light          [m/s]
   me   = 0.510998910e+6   # electron rest energy    [eV]
   h    = 4.13566752e-15   # Plank constant          [eV*s]
   hbar = 6.58211928e-16   # Plank constant reduced  [eV*s]
@@ -26,7 +30,7 @@ class EDGE(Constants):
     self.BTuner  = cfg.getfloat('edge', 'BveppTuner')
     self.Radius  = cfg.getfloat('edge', 'VeppRadius')
     self.Asymme  = cfg.getfloat('edge', 'Asymmetry')
-    self.SaveDB  = cfg.get(     'edge', 'SaveForSND')
+    self.SaveDB  = sql and ('True' in cfg.get('edge', 'SaveForSND'))
     lwave        = cfg.getfloat('edge', 'WaveLength')       # laser wavelength [m]
     Constants.wo = Constants.h*Constants.c/lwave            # laser photon energy [eV]
     Constants.Eo = 0.25e-6 * Constants.me**2 / Constants.wo # (me^2/4wo) [MeV]
@@ -35,7 +39,6 @@ class EDGE(Constants):
       if cfg.has_option('edge', b) and cfg.has_option('edge', e):
         self.exclude.append([ cfg.getfloat('edge', b), cfg.getfloat('edge', e) ])
       else: break
-
     self.cc      = ROOT.TCanvas('cc','BEMS for VEPP-2000', 800, 600, 800, 600)
     self.const   = ROOT.TF1('const', '[0]')
     self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7 ); self.simple.SetLineColor(ROOT.kRed)
@@ -58,10 +61,9 @@ class EDGE(Constants):
       else:                     self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
       k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2;                        # [eV*eV / eV**2]
       Wmax = 1.e+3*self.Eo*k/(1.+k)                                             # [keV]
-      zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
-    else:
+    else: 
       Wmax = 0.0
-      zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), 0.0)
+    zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
     if gain:  
       self.hps.SetBins(nbins, zero, zero + gain * nbins); self.hps.Rebin(self.Merger)
       if Wmax:
@@ -264,7 +266,7 @@ class EdgeSimple(Constants): # Ai integral (classical formula) and Klein-Nishina
     X = p[0]*p[1] * Constants.RemB   # Xi, free field if comment next line
     D = x[0] - p[0]*k/(1.+k)*1.e+3   # (W - Wmax) [keV]
     I = self.iAiry(ROOT.TMath.Power((u/X),0.6666666666666666) * (1.-k/u))
-    return I * p[2] * (1.0 + p[3]*D + p[4]*D**2) + p[5] + p[6]*D
+    return I * p[2]*(1.0 + p[3]*D + p[4]*D**2) + p[5] + p[6]*D
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with normal Gaussian from beam spread
@@ -277,12 +279,26 @@ class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with 
     return self.C*(R+L)/(p[0]+p[1])
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-def fitParameters(fitf):
-  n, p, e = fitf.GetNumberFreeParameters(), [], []
-  for i in range(n):  
-    p.append(fitf.GetParameter(i))
-    e.append(fitf.GetParError(i))
-  return {'p':p,'e':e}
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+"""
+class TheResults(cfg_file):
+  cfg = ConfigParser.ConfigParser()
+  cfg.read(cfg_file)
+  roofile = cfg.get('edge', 'file')
+  
+  def AddPoint(self, UTB, UTE, R):
+    pass
+
+  def GetGraph(self, UTB, UTE, R):
+    f, MERE  = ROOT.TFile(self.roofile), ROOT.TList()
+    f.GetListOfKeys()
+    for el in [el.GetName() for el in f.GetListOfKeys()]:
+      pass
+
+  def DoReview(self): 
+    pass
+"""    
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -290,17 +306,25 @@ def Save_for_SND(UTB, UTE, R):
   t, dt = UTB, UTE - UTB;  E, dE = R['BE'];  B, dB = R['BF'];  S, dS = R['BS']
   PL = {'/EMS/DT':dt, '/EMS/E':E, '/EMS/DE':dE, '/EMS/B':B, '/EMS/DB':dB, '/EMS/S':S, '/EMS/DS':dS}
   print 'WRITING TO SND ',
-  storage = Storage()
+  DB = Storage()
   for k,v in PL.iteritems(): 
-    storage.register(k); storage[k]=v; print '.', 
+    DB.register(k); DB[k]=v; print '.', 
   try:
-    storage.insert(t)
+    DB.insert(t)
   except:
     try:
-      storage.replace(t)
+      DB.replace(t)
     except: 
       print 'Warning! Can not write nor replace data!'
       return
   print ' DONE'
   return
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+def fitParameters(fitf):
+  n, p, e = fitf.GetNumberFreeParameters(), [], []
+  for i in range(n):  
+    p.append(fitf.GetParameter(i))
+    e.append(fitf.GetParError(i))
+  return {'p':p,'e':e}
 

@@ -162,7 +162,7 @@ class EDGE(Constants):
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
       print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
-      OK = (E['e'][0]/E['p'][0]<0.001) and (E['e'][1]/E['p'][1]<0.1) 
+      OK = (E['e'][0]/E['p'][0]<0.001) and R.Prob()>0.01
       self.Legend.Clear(); self.Legend.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Probability %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
       self.Legend.AddEntry(self.comple, 'E_{beam} = %8.3f #pm %5.3f [MeV]'   % (BE, dBE), 'l')
       self.Legend.AddEntry(self.comple, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), 'l')

@@ -39,15 +39,18 @@ class EDGE(Constants):
       if cfg.has_option('edge', b) and cfg.has_option('edge', e):
         self.exclude.append([ cfg.getfloat('edge', b), cfg.getfloat('edge', e) ])
       else: break
+      
     self.cc      = ROOT.TCanvas('cc','BEMS for VEPP-2000', 800, 600, 800, 600)
     self.const   = ROOT.TF1('const', '[0]')
     self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7 ); self.simple.SetLineColor(ROOT.kRed)
     self.spreso  = ROOT.TF1('spreso', HPGeSpread(), 0, 1, 3 ); 
     self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC'); 
     self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
+    print cfg_file
+    self.plots   = EMSResults(cfg_file)
     
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def __del__(self):    
+  def __del__(self):
     self.cc.cd(); self.cc.Clear() 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -55,12 +58,13 @@ class EDGE(Constants):
     self.hps = hps.Clone(); nbins = hps.GetNbinsX(); self.hps.GetXaxis().SetTitle('E_{#gamma}, keV')
     self.VEPP2K = VEPP2K_DB().GetRunInfo(filechain)
     if self.VEPP2K:
-      if abs(self.ETuner)<10.0: self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
-      else:                     self.Eo = self.ETuner                           # [MeV]
-      if self.Radius:           self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T] 
-      else:                     self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
-      k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2;                        # [eV*eV / eV**2]
-      Wmax = 1.e+3*self.Eo*k/(1.+k)                                             # [keV]
+      if abs(self.ETuner)<10.0:   self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
+      else:                       self.Eo = self.ETuner                           # [MeV]
+      if self.Radius:             self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T] 
+      elif abs(self.BTuner)<0.1:  self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
+      else:                       self.Bo = self.BTuner                           # [T]
+      k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2;                          # [eV*eV / eV**2]
+      Wmax = 1.e+3*self.Eo*k/(1.+k)                                               # [keV]
     else: 
       Wmax = 0.0
     zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
@@ -75,7 +79,9 @@ class EDGE(Constants):
         Wmax = self.fitEdgeSimple(Wmax, self.Ranger)
         if Wmax:
           Results = self.fitEdgeComple(Wmax, self.Ranger)
-          if Results and self.SaveDB: Save_for_SND(UTB, UTE, Results)
+          if Results:
+            self.plots.AddPoint(         UTB, UTE, Results)
+            if self.SaveDB: Save_for_SND(UTB, UTE, Results)
       else:
         print 'No Edge?'
         self.cc.cd();      self.cc.Clear();    self.cc.SetGrid()
@@ -128,7 +134,7 @@ class EDGE(Constants):
     cnvl = ROOT.TF1Convolution('simple', 'spreso'); cnvl.SetNofPointsFFT(1000)
     self.comple = ROOT.TF1('comple',cnvl,E1,E2,10);   self.comple.SetNpx(1000)
     self.simple.SetLineColor(ROOT.kBlue);  self.comple.SetLineColor(ROOT.kRed)
-    p = fitParameters(self.simple)['p'];  p[2] *= 0.6;  p[5] *= 0.6;  p.extend([self.RR, self.RL, 1.0])
+    p = fitParameters(self.simple)['p'];  p[2] *= 0.4;  p[5] *= 0.4;  p.extend([self.RR, self.RL, 1.0])
     self.comple.SetParameters(numpy.fromiter(p, numpy.float))
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
 
@@ -163,46 +169,24 @@ class EDGE(Constants):
       self.Legend.AddEntry(self.comple, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), 'l')
       self.Legend.Draw('SAME')
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
-<<<<<<< HEAD
-    if OK: 
-      k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
-      return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
-#    if offline: raw_input('Bad Fit?')
-    print 'Complex fit: bad fit, bad amplitude, spread or χ2';  return 0.0
-=======
     if OK: return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS]}
     else:  print 'Complex fit: bad fit, bad amplitude, spread or χ2';  return False
 
->>>>>>> upstream/master
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def GetCalibrationResults(self, t, wmax):
     for attempt in xrange(3):
       Scale = self.HPGe.Get_Calibration(t, wmax)
-      if len(Scale): break
-      else:
-        print 'Waiting for scale calibration results...';   time.sleep(20) 
-    if not len(Scale):
-<<<<<<< HEAD
-      print 'No valid calibration was found'
-      return 0, 0
-    Quality = []
-    for c in range(len(Scale['T'])):
-      Quality.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
-    if len(Quality)==0:   
-      print 'No valid calibration was found'
-      return 0,0
-    c = Quality.index(min(Quality))
-=======
-      print 'No valid calibration was found'; return 0, 0
-#    Quality = []
-#    for c in range(len(Scale['T'])):
-#      Quality.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
-#    if len(Quality)==0:   
-#      print 'No valid calibration was found'; return 0,0
-#    c = Quality.index(min(Quality))
-    c = 0
->>>>>>> upstream/master
+      L = len(Scale['R']) 
+      if L: break
+      else: print 'Waiting 20s for calibration results...';   time.sleep(20) 
+    if L == 1: c = 0
+    elif L >1:
+      Q = [Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c] for c in range(L)]
+#      for c in range(L): Q.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
+      if len(Q)==0:    print 'No valid calibration was found'; return 0, 0
+      c = Q.index(min(Q))
+    else:              print 'No valid calibration was found'; return 0, 0
     zero, gain         = Scale['Z'][c], Scale['G' ][c]
     self.dW            =                Scale['dW'][c] # linear calibration statistical error, keV
     self.SC, self.dSC  = Scale['C'][c], Scale['dC'][c] # PB-5  scale correction and its error, keV
@@ -213,11 +197,6 @@ class EDGE(Constants):
     print ' ║  W_max  = %9.3f keV  │ σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV  ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
     print ' ╚════════════════════════╧════════════════════════════╧══════════════════════════╝\n'
     return zero, gain  
-<<<<<<< HEAD
-=======
-
->>>>>>> upstream/master
-
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -248,10 +227,10 @@ class VEPP2K_DB:
     A = numpy.fromiter(T['Ee'], numpy.float);  R['E'], R['dE']  = A.mean(), A.std()
     A = numpy.fromiter(T['Ie'], numpy.float);  R['I'], R['dI']  = A.mean(), A.std()
     A = numpy.fromiter(T['Bo'], numpy.float);  R['B'], R['dB']  = A.mean(), A.std()
-    if R['E']<100. or R['I'] < 5.0 or R['B'] <1.0: return False 
     print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗' 
-    print ' ║  E = %6.3f ± %5.3f MeV │ Ie = %5.1f ± %5.1f mA   │  Bo = %7.5f ± %7.5f T ║' % (R['E'], R['dE'], R['I'], R['dI'], R['B'], R['dB'])
+    print ' ║  E = %7.2f ± %5.2f MeV │ Ie = %5.1f ± %5.1f mA   │  Bo = %7.5f ± %7.5f T ║' % (R['E'], R['dE'], R['I'], R['dI'], R['B'], R['dB'])
     print ' ╚══════════════════════════╧═════════════════════════╧═══════════════════════════╝\n'
+    if R['I'] < 5.0 : return False 
     return R
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -281,24 +260,60 @@ class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-"""
-class TheResults(cfg_file):
-  cfg = ConfigParser.ConfigParser()
-  cfg.read(cfg_file)
-  roofile = cfg.get('edge', 'file')
-  
+class EMSResults:
+  BE, BF, BS = ROOT.TGraphErrors(), ROOT.TGraphErrors(), ROOT.TGraphErrors()
+
+  def __init__(self, cfg_file):
+    cfg = ConfigParser.ConfigParser()
+    cfg.read(cfg_file)
+    self.roofile = cfg.get('scan', 'file')
+ 
+  def __del__(self):
+    if hasattr(self, 'rc'): self.rc.cd(); self.rc.Clear()
+
+  def SaveGraphs(self):
+    fp = ROOT.TFile(self.roofile, 'UPDATE')
+    fp.WriteObject(self.BE, 'BE')
+    fp.WriteObject(self.BF, 'BF')
+    fp.WriteObject(self.BS, 'BS')
+    fp.Close()
+
+  def ReadGraphs(self):
+    if os.path.isfile(self.roofile):
+      fp = ROOT.TFile(self.roofile, 'READ')
+      fp.GetObject('BE', self.BE); n = self.BE.GetN()
+      fp.GetObject('BF', self.BF); m = self.BF.GetN()
+      fp.GetObject('BS', self.BS); k = self.BS.GetN()
+      fp.Close()
+      return n, m, k
+    else:
+      return 0, 0, 0
+
   def AddPoint(self, UTB, UTE, R):
-    pass
-
-  def GetGraph(self, UTB, UTE, R):
-    f, MERE  = ROOT.TFile(self.roofile), ROOT.TList()
-    f.GetListOfKeys()
-    for el in [el.GetName() for el in f.GetListOfKeys()]:
-      pass
-
-  def DoReview(self): 
-    pass
-"""    
+    n, m, k = self.ReadGraphs()
+    x, dx = 0.5*(UTB + UTE), 0.5*(UTE - UTB)
+    y, dy = R['BE']; self.BE.SetPoint(n, x, y); self.BE.SetPointError(n, dx, dy)    
+    y, dy = R['BF']; self.BF.SetPoint(m, x, y); self.BF.SetPointError(m, dx, dy)    
+    y, dy = R['BS']; self.BS.SetPoint(k, x, y); self.BS.SetPointError(k, dx, dy)    
+    self.SaveGraphs()
+    
+  def ShowRunInfo(self):
+    n, m, k = self.ReadGraphs()
+    for g in [self.BE, self.BF, self.BS]:
+      g.GetXaxis().SetTimeDisplay(1); g.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
+      g.GetXaxis().SetTitle('time');  g.GetXaxis().SetLabelOffset(0.02)
+      g.SetMarkerColor(ROOT.kRed); g.SetMarkerStyle(20); g.GetYaxis().SetDecimals()
+    self.rc = ROOT.TCanvas('rc','BEMS results for VEPP-2000', 5, 5, 1000, 1200)
+    self.rc.Divide(1,3)
+    self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Draw('AP'); 
+    self.BE.GetXaxis().SetTitle('time');         self.BE.GetYaxis().SetTitle('Beam energy [MeV]')
+    self.rc.cd(2); self.rc.GetPad(2).SetGrid();  self.BF.Draw('AP'); 
+    self.BF.GetXaxis().SetTitle('time');         self.BF.GetYaxis().SetTitle('Bending field [T]')
+    self.rc.cd(3); self.rc.GetPad(3).SetGrid();  self.BS.Draw('AP'); 
+    self.BS.GetXaxis().SetTitle('time');         self.BS.GetYaxis().SetTitle('Beam energy spread [keV]')
+    self.rc.Modified()
+    self.rc.Update()
+    raw_input()
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

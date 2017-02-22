@@ -28,9 +28,16 @@ def Usage():
  ╚════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
 
-if ('-h' in sys.argv) or ('--help' in sys.argv): Usage() 
-else: import ROOT
-
+if ('-h' in sys.argv) or ('--help' in sys.argv): 
+  Usage() 
+else: 
+  import ROOT
+  ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
+  ROOT.gROOT.SetStyle("Plain")
+  ROOT.gROOT.ForceStyle()
+  ROOT.gStyle.SetTitleBorderSize(0)
+  ROOT.gStyle.SetOptStat(0)
+  ROOT.gStyle.SetOptFit(0)
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class ToDo:
@@ -129,8 +136,6 @@ class Histogram:
   nbins    = 16384   # number of bins in a histogram
   tmin     = 10.0    # minimum data acquisition time for one file , s
   EME      = False
-  ROOT.gROOT.SetStyle("Plain");       ROOT.gROOT.ForceStyle()
-  ROOT.gStyle.SetTitleBorderSize(0);  ROOT.gStyle.SetOptStat(0);    ROOT.gStyle.SetOptFit(0)
   hps      = ROOT.TH1I('hps','',nbins, 0, nbins)
 
   def __init__(self,todo):
@@ -142,7 +147,6 @@ class Histogram:
       try: from bepc.bepc     import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'BEPC is not yet implemented'; exit(0)
     elif todo.edge and 'VEPP2K' in todo.orig:
-      ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
       try: from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
       except ImportError: print 'V2K is not yet implemented'; exit(0)
     if self.tokeV: 
@@ -246,9 +250,10 @@ def main(argv):
         from bepc.energy_scan import Energy_Scan
         A = Energy_Scan()
         A.Go(flist,todo)
-      else:
-        print 'Is this data from BEPC?'
-        exit()
+      elif 'VEPP2K' in todo.orig:
+        from vepp2k.vepp2k import EMSResults
+        A = EMSResults(todo.cfg_file)
+        A.ShowRunInfo()
     elif todo.verify:
       from scale.isotopes import Isotopes
       A = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
@@ -267,7 +272,7 @@ def main(argv):
           break
       raw_input('All done. <Enter> to quit.')
   except KeyboardInterrupt: print '\nExecution is interrupted'
-  del A
+#  del A
   exit()
   
 

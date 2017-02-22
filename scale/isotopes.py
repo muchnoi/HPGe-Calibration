@@ -411,16 +411,16 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 #    print 'Get calibration from: ', self.outfile  
     for el in [el.GetName() for el in f.GetListOfKeys()]:
       utb, ute, ptype = eval(el)
-      if t==0 or utb<t<ute: 
+      if t==0 or (utb-120)<t<(ute+120): 
         f.GetObject(el,CARE)
         zero, gain = eval(str(CARE[0]))
         N,X,Y,dX,dY = [],[],[],[],[]
         
         for G in [CARE[1], CARE[2], CARE[3], CARE[4]]:
           Np = G.GetN(); N.append(Np); 
-          X.append( [ G.GetX()[n] for n in range(Np)]); 
-          dX.append([G.GetEX()[n] for n in range(Np)]); 
-          Y.append( [ G.GetY()[n] for n in range(Np)]); 
+          X.append( [ G.GetX()[n] for n in range(Np)])
+          dX.append([G.GetEX()[n] for n in range(Np)])
+          Y.append( [ G.GetY()[n] for n in range(Np)])
           dY.append([G.GetEY()[n] for n in range(Np)])
                   
         # 1. Linear Scale Calibration

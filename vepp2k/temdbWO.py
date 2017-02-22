@@ -2,15 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Я завел следующие поля в базе:
-/EMS/DT
-/EMS/E
-/EMS/DE
-/EMS/B
-/EMS/DB
-/EMS/S
-/EMS/DS
-Пакет в аттаче. Я добавил также простой "replace" -- работать будет только если время совпадает в точности.  Время передается либо в
-time.time_struct либо float либо int (последние 2 -- секунды от 1970 г.).
+/EMS/DT /EMS/E /EMS/DE /EMS/B /EMS/DB /EMS/S /EMS/DS
+Я добавил также простой "replace" -- работать будет только если время совпадает в точности.  
+Время передается либо в time.time_struct либо float либо int (последние 2 -- секунды от 1970 г.).
 """
 import sys, time, MySQLdb
 
@@ -41,9 +35,7 @@ class Registry(object):
         return channel
 
     def __call__(self, name):      return self.registry[name]
-
     def __contains__(self, name):  return name in self.registry
-
     def __iter__(self):            return iter(self.registry)
 
     def __getitem__(self, name):
@@ -61,18 +53,14 @@ class Registry(object):
 class Channel(object):
     def __init__(self, name, connection):
         list = [ p for p in name.split("/") if p!="" ] # remove spare '/'
-
         self.id    = None
         self.stype = None
-
         self.name  = list[-1]
         self.path  = '/'+"/".join(list[:-1])
         assert self.name != ""
         assert self.path != ""
-        
         self.datum    = None
         self.modified = False
-
         cursor = connection.cursor()
         cursor.execute(queryName, (self.path, self.name) )
         # message("name cursor messages: %s" % (cursor.messages,) )
@@ -89,10 +77,8 @@ class Channel(object):
     def modify(self, value):
         assert self.id!=None
         assert self.stype in (0, 1)
-        if self.stype==0:
-            self.datum =   int(value)
-        else:
-            self.datum = float(value)
+        if self.stype==0: self.datum =   int(value)
+        else:             self.datum = float(value)
         self.modified = True
 
 class Storage(object):
@@ -102,26 +88,16 @@ class Storage(object):
                  passwd = "power",
                  db     = "temdbase",
                  port   = 3307):
-        self.connection = MySQLdb.connect(host   = host,
-                                            user   = user,
-                                            passwd = passwd,
-                                            db     = db,
-                                            port   = port)
+        self.connection = MySQLdb.connect(host=host, user=user, passwd=passwd, db=db, port=port)
         self.connection.autocommit(True)
         # message("connection messages: %s"%self.connection.messages)
         self.registry     = Registry(self)
         self.newstamp     = None
         self.oldstamp     = None
 
-<<<<<<< HEAD
     def ping(self, reconnectFlag = False):    return self.connection.ping(reconnectFlag)
 
     def channel(self, name):                  return self.registry(name)
-=======
-    def ping(self, reconnectFlag = False): return self.connection.ping(reconnectFlag)
-
-    def channel(self, name):               return self.registry(name)
->>>>>>> 84b1778f6ff17a7a178add0f5ca8cdfeddf970f0
 
     def prepareQueues(self):
         queueD, queueI = [], []
@@ -136,12 +112,7 @@ class Storage(object):
         self.newstamp = timeToMks(t)
         queueD, queueI = self.prepareQueues()
         if len(queueD)==0 + len(queueI)==0:
-<<<<<<< HEAD
-            message("nothing to replace")
-            return
-=======
             message("nothing to replace");  return
->>>>>>> 84b1778f6ff17a7a178add0f5ca8cdfeddf970f0
         self.queries = self.generateReplace(queueD, "double") + self.generateReplace(queueI, "integer")
         self.execute()
 
@@ -149,14 +120,8 @@ class Storage(object):
         self.newstamp = timeToMks(t)
         queueD, queueI = self.prepareQueues()
         if len(queueD)==0 + len(queueI)==0:
-<<<<<<< HEAD
-            message("nothing to save")
-            return
+            message("nothing to save");    return
         self.queries = [ self.generateInsert(queueD, "double"), self.generateInsert(queueI, "integer"), ]
-=======
-            message("nothing to save");            return
-        self.queries = [self.generateInsert(queueD, "double"), self.generateInsert(queueI, "integer"),]
->>>>>>> 84b1778f6ff17a7a178add0f5ca8cdfeddf970f0
         self.execute()
 
     def execute(self):

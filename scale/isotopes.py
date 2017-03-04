@@ -17,13 +17,14 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
   pce    = 2.96e-3     # electron-hole pair creation energy in Ge, keV
   Colors = [ROOT.kRed+2, ROOT.kBlue+2, ROOT.kGreen+3, ROOT.kGray+2]
   Styles = [20,  21,  22,   23];    Sizes  = [1.2, 1.0, 1.25, 1.25]
+  emin, emax = 100., 10000.  # just for a case when no *.cfg file is present 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def __init__(self, outfile, cfg_file, action):
-    self.InitParameters(cfg_file)    
     self.outfile = outfile
     Atlas.__init__(self)
     if action == 'calibration':
+      self.InitParameters(cfg_file)
       self.cv   =  ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 1002)
       self.PADS = [ROOT.TPad('PAD5', 'Scale',      0.01, 0.01, 0.49, 0.36, 0, 1),
                    ROOT.TPad('PAD6', 'Resolution', 0.51, 0.01, 0.99, 0.36, 0, 1),
@@ -32,7 +33,9 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
                    ROOT.TPad('PAD2', 'Fit 2',      0.25, 0.37, 0.50, 0.65, 0, 1),
                    ROOT.TPad('PAD3', 'Fit 3',      0.50, 0.37, 0.75, 0.65, 0, 1),
                    ROOT.TPad('PAD4', 'Fit 4',      0.75, 0.37, 0.99, 0.65, 0, 1)]
-      for pad in self.PADS:  self.cv.cd(); pad.Draw()
+      for pad in range(7):
+        self.cv.cd(); self.PADS[pad].Draw()
+        if pad > 2:   self.PADS[pad].SetLogy()
 
       self.SP = ROOT.TSpectrum()
       # Peaks Fitting Section
@@ -195,8 +198,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     H = self.hps.DrawCopy();  H.GetXaxis().SetRangeUser(L, R)
     H.SetNameTitle('Spectrum', '%5s (%.3f keV) #chi^{2}/ndf = %.1f/%s' % (name, p['E'], p['shape']['Chi2'], p['shape']['NDF']))
     self.asps.DrawCopy('SAME')
-#    self.cv.SaveAs('PEAKs/%.0fkeV.pdf' % peak['E'])
-#    raw_input()
+#    self.cv.Modified(); self.cv.Update()
+#    self.PADS[npad].SaveAs('%.0fkeV.pdf' % p['E'])
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

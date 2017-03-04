@@ -46,7 +46,6 @@ class EDGE(Constants):
     self.spreso  = ROOT.TF1('spreso', HPGeSpread(), 0, 1, 3 ); 
     self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC'); 
     self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
-    print cfg_file
     self.plots   = EMSResults(cfg_file)
     
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -116,6 +115,8 @@ class EDGE(Constants):
       print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
       OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5) 
+      self.Legend.Clear(); # self.Legend.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Probability %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
+      self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
     
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
     self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1, E2)
@@ -124,15 +125,15 @@ class EDGE(Constants):
     if OK: 
       k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
-#    if offline: raw_input('Bad Fit?')
-    print 'Simple fit: bad fit, bad amplitude, spread or χ2';  return 0.0
+    else:
+      print 'Simple fit: bad fit, bad amplitude, spread or χ2';  return 0.0
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self,W,LBK):
     
     K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
-    cnvl = ROOT.TF1Convolution('simple', 'spreso'); cnvl.SetNofPointsFFT(1000)
-    self.comple = ROOT.TF1('comple',cnvl,E1,E2,10);   self.comple.SetNpx(1000)
+    self.convol = ROOT.TF1Convolution('simple', 'spreso');     self.convol.SetNofPointsFFT(1000)
+    self.comple = ROOT.TF1('comple', self.convol, E1, E2, 10); self.comple.SetNpx(1000)
     self.simple.SetLineColor(ROOT.kBlue);  self.comple.SetLineColor(ROOT.kRed)
     p = fitParameters(self.simple)['p'];  p[2] *= 0.4;  p[5] *= 0.4;  p.extend([self.RR, self.RL, 1.0])
     self.comple.SetParameters(numpy.fromiter(p, numpy.float))
@@ -163,7 +164,8 @@ class EDGE(Constants):
       print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
       OK = (E['e'][0]/E['p'][0]<0.001) and R.Prob()>0.01
-      self.Legend.Clear(); self.Legend.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Probability %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
+      #self.Legend.Clear(); # self.Legend.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Probability %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
+      self.Legend.AddEntry(self.comple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
       self.Legend.AddEntry(self.comple, 'E_{beam} = %8.3f #pm %5.3f [MeV]'   % (BE, dBE), 'l')
       self.Legend.AddEntry(self.comple, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), 'l')
       self.Legend.AddEntry(self.comple, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), 'l')

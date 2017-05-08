@@ -21,6 +21,7 @@ class EDGE:
     self.Merger  =                 cfg.getint('edge', 'BinsMerger')
     self.ETuner  =               cfg.getfloat('edge', 'EbepcTuner')
     self.Asymme  =               cfg.getfloat('edge', 'Asymmetry')
+    self.SaveDB  =           bool(cfg.getint('edge', 'BinsMerger'))
     
     self.cc      = ROOT.TCanvas('cc','BEMS for BEPC-II', 800, 600, 800, 600); # self.cc.Divide(1,2)
     self.const   = ROOT.TF1('const', '[0]')
@@ -160,6 +161,9 @@ class EDGE:
     print ' ║ BEMS beam energy = %8.3f ± %5.3f MeV  (SR correction to IP +%5.3f MeV was added)  ║'      % (EB, dEB, SR)
     print ' ║ BEMS beam spread =     %4.0f ±  %4.0f keV                                              ║' % (BS, dBS)
     print ' ╚══════════════════════════════════════════════════════════════════════════════════════╝\n'
+    self.Lg2.AddEntry(self.comple, 'E_{beam} = %8.2f #pm %5.2f MeV' % (EB, dEB), 'l')
+    self.Lg2.AddEntry(self.comple, '#sigma_{E} = %4.0f #pm %4.0f keV' % (BS, dBS), 'l')
+    self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
 
     t, dt = 0.5*(utb + ute), 0.5*(ute - utb)
     return (t, dt, EB, dEB, BS, dBS)

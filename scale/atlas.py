@@ -4,7 +4,7 @@ class Atlas:
     self.atlas={}
 
 #    self.atlas['  H1 ']   =   [{'Key':'0', 'W':2223.250, 'dW':.050, 'CC':False,   'RC':True}]
-    self.atlas['Mn55 ']   =   [{'Key':'0', 'W': 846.754, 'dW':.020, 'CC':False,  'RC':False}]
+    self.atlas['Mn56 ']   =   [{'Key':'0', 'W': 846.754, 'dW':.020, 'CC':False,  'RC':False}]
     self.atlas[' O16 ']   =   [{'Key':'0', 'W':6129.266, 'dW':.054, 'CC':False,  'RC':False}]
     self.atlas[' K40 ']   =   [{'Key':'0', 'W':1460.750, 'dW':.060, 'CC':False,  'RC':False}]
 #    self.atlas['annig']   =   [{'Key':'0', 'W': 510.998, 'dW':.060, 'CC':False,  'RC':False}]

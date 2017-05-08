@@ -62,11 +62,12 @@ class ToDo:
     self.tokeV    = self.online   = True
     self.prompt   = self.listonly = self.edge = self.escan = self.verify = False
     
-    self.scalefile  = 'escale.root'
     self.cfg_file   = 'online.cfg'
-    if len(sys.argv)>1: self.Options(sys.argv)
+    self.scalefile  = 'escale.root'
+    self.Options(sys.argv)
 
   def Options(self,argv):
+    S = D = E = False
     sopt = "d:e:f:t:n:s:c:v:ihkl"
     lopt = ["folder=","efolder=","file=","time=","nfiles=","scale=","cfg=","verify=","interactive","help","keV","list","edge","escan"]
     try:
@@ -77,25 +78,22 @@ class ToDo:
     for opt, arg in opts:
       if   opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
       elif opt in ("-n", "--nf")         : self.nfile     = int(arg)
-      elif opt in ("-d", "--folder")     : self.folder    = arg;      self.online = False
-      elif opt in ("-e", "--efolder")    : self.efolder   = arg;      self.online = False
+      elif opt in ("-d", "--folder")     : self.folder    = arg;      self.online = False; D = True
+      elif opt in ("-e", "--efolder")    : self.efolder   = arg;      self.online = False; E = True
       elif opt in ("-f", "--file")       : self.filename  = arg;      self.online = False
       elif opt in ("-t", "--time")       : self.tfrom     = int(arg); self.online = False
       elif opt in ("-k", "--keV")        : self.tokeV     = False
-      elif opt in ("-s", "--scale")      : self.scalefile = arg;  
+      elif opt in ("-s", "--scale")      : self.scalefile = arg;                           S = True
       elif opt in ("-v", "--verify")     : self.verify    = True;     self.energy = float(arg);  
       elif opt in ("-l", "--list")       : self.listonly  = True
       elif opt in (      "--edge")       : self.edge      = True;     self.tokeV  = False
       elif opt in (      "--escan")      : self.escan     = True
-      elif opt in ("-c", "--cfg")        :
-        self.cfg_file  = arg;  
-        cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
-        if cfg.has_option('scale', 'file') and not ("-s"  in opts) and not ("--scale"   in opts): 
-          self.scalefile = cfg.get('scale', 'file'); self.online = False
-        if cfg.has_option('scan', 'bdate') and not ("-d"  in opts) and not ("--folder"  in opts):
-          self.folder = cfg.get('scan', 'bdate');    self.online = False
-        if cfg.has_option('scan', 'edate') and not ("-e"  in opts) and not ("--efolder" in opts):
-          self.efolder = cfg.get('scan', 'edate');   self.online = False
+      elif opt in ("-c", "--cfg")        : self.cfg_file  = arg;  
+    cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
+    if cfg.has_option('scale', 'file') and not S: self.scalefile = cfg.get('scale', 'file')
+    if not self.online:  
+      if cfg.has_option('scan', 'bdate') and not D:  self.folder = cfg.get('scan', 'bdate') 
+      if cfg.has_option('scan', 'edate') and not E: self.efolder = cfg.get('scan', 'edate')
 
   def GetList(self):
     fold_list, file_list = [], []
@@ -137,6 +135,7 @@ class Histogram:
   tmin     = 10.0    # minimum data acquisition time for one file , s
   EME      = False
   hps      = ROOT.TH1I('hps','',nbins, 0, nbins)
+
 
   def __init__(self,todo):
     self.nfile, self.prompt, self.tokeV = todo.nfile, todo.prompt, todo.tokeV

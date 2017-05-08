@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import ROOT, time, sys, ConfigParser
 import numpy as np
-from atlas   import Atlas
+from atlas import Atlas
 from scipy.interpolate import UnivariateSpline
 
 # http://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.UnivariateSpline.html#scipy.interpolate.UnivariateSpline
@@ -60,7 +60,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.eres_C   = ROOT.TF1('eres_C', ResolutionModel(), -self.emax, self.emax, 4) # combined resolution model [%]
     self.eres_C.SetParameters(1.0,  0.24, 0.000, 100.0); self.eres_C.SetLineColor(self.Colors[0])
     self.eres_C.SetParLimits( 0,    0.40, 10.00);        self.eres_C.SetParLimits(1, 0.10, 0.500)
-    self.eres_C.SetParLimits( 2,    0.00, 0.001);        self.eres_C.SetParLimits(3, 0.00, 1000.)
+    self.eres_C.SetParLimits( 2,    0.00, 0.001);        #self.eres_C.SetParLimits(3, 0.00, 10000.)
     self.pulser   = ROOT.TF1('pulser', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
     self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[2])
     self.InitGraphics()    
@@ -138,6 +138,15 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.ScalePeaks  = [el for el in self.KnownPeaks if          el['incc']];       self.nScalePeaks = len(self.ScalePeaks)
     self.ShapePeaks  = [el for el in self.KnownPeaks if          el['inrc']];       self.nShapePeaks = len(self.ShapePeaks)
     self.PulsePeaks  = [el for el in self.KnownPeaks if 'PB5' in el['name']];       self.nPulsePeaks = len(self.PulsePeaks)
+    ### this is to remove wrongly determined peaks
+    i=0
+    while (i<self.nPulsePeaks-1):
+      if self.PulsePeaks[i]['name'] == self.PulsePeaks[i+1]['name']:
+        if self.PulsePeaks[i]['A']<self.PulsePeaks[i+1]['A']:  del self.PulsePeaks[i]
+        else:                                                  del self.PulsePeaks[i+1]
+        self.nPulsePeaks -= 1
+      else:  i += 1  
+    ###
     self.OtherPeaks  = [el for el in self.KnownPeaks if not el in self.PulsePeaks]
     self.OtherPeaks  = [el for el in self.OtherPeaks if not el in self.ScalePeaks]
     self.nOtherPeaks = len(self.OtherPeaks)
@@ -294,7 +303,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     PP2 = (P['p1'], P['dp1'],      P['p3'],      P['dp3'], R.Prob())
     print ' ╔ Resolution by isotopes: ═╤══════════════════════════════╤══════════════════════╗'
     print ' ║ Noise: %5.3f ± %5.3f keV │ Trapping:  %5.3f ± %5.3f ppm │ χ2/NDF:   %5.1f/%3d  ║' % PP1
-    print ' ║ Fano fact: %5.3f ± %5.3f │ Threshold: %5.1f ± %5.1f keV │ Probability:  %5.3f  ║' % PP2
+    print ' ║ Fano fact: %5.3f ± %5.3f │ Threshold: %5.0f ± %5.0f keV │ Probability:  %5.3f  ║' % PP2
     print ' ╚══════════════════════════╧══════════════════════════════╧══════════════════════╝\n'
     return quality
 

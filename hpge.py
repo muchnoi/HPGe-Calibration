@@ -84,10 +84,10 @@ class ToDo:
       elif opt in ("-t", "--time")       : self.tfrom     = int(arg); self.online = False
       elif opt in ("-k", "--keV")        : self.tokeV     = False
       elif opt in ("-s", "--scale")      : self.scalefile = arg;                           S = True
-      elif opt in ("-v", "--verify")     : self.verify    = True;     self.energy = float(arg);  
-      elif opt in ("-l", "--list")       : self.listonly  = True
-      elif opt in (      "--edge")       : self.edge      = True;     self.tokeV  = False
-      elif opt in (      "--escan")      : self.escan     = True
+      elif opt in ("-v", "--verify")     : self.verify    = True;     self.online = False; self.energy = float(arg)
+      elif opt in ("-l", "--list")       : self.listonly  = True;     self.online = False
+      elif opt in (      "--edge")       : self.edge      = True;                          self.tokeV  = False
+      elif opt in (      "--escan")      : self.escan     = True;     self.online = False
       elif opt in ("-c", "--cfg")        : self.cfg_file  = arg;  
     cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file') and not S: self.scalefile = cfg.get('scale', 'file')

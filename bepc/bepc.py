@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
-#import paramiko
+
 import ROOT, cPickle, os, time, ConfigParser
 import numpy as np
 from scale.isotopes import Isotopes
 from hpge import DataFile, Histogram
+ssh = True
+try: 
+  import paramiko
+except ImportError:
+  ssh = False 
+  print 'paramiko is unavailable'
 
 
 class EDGE:
@@ -21,7 +27,7 @@ class EDGE:
     self.Merger  =                 cfg.getint('edge', 'BinsMerger')
     self.ETuner  =               cfg.getfloat('edge', 'EbepcTuner')
     self.Asymme  =               cfg.getfloat('edge', 'Asymmetry')
-    self.SaveDB  =           bool(cfg.getint('edge', 'BinsMerger'))
+    self.SaveDB  =         ssh and cfg.getint('edge', 'SaveForDB')
     
     self.cc      = ROOT.TCanvas('cc','BEMS for BEPC-II', 800, 600, 800, 600); # self.cc.Divide(1,2)
     self.const   = ROOT.TF1('const', '[0]')
@@ -49,9 +55,10 @@ class EDGE:
          Edge = self.fitEdgeComplex(Edge, self.Ranger)
          if Edge:
            R = self.Beam_Energy(UTB,UTE)
-#          self.Save_Files(R)
-#          self.Save_DB(R)
-#          self.Save_WWW()
+           if R and self.SaveDB:
+             self.Save_Files(R)
+             self.Save_DB(R)
+             self.Save_WWW()
            return R
     else: return False
            
@@ -70,25 +77,27 @@ class EDGE:
       W = self.simple.GetParameter(1);   E1, E2 = W - LBK*Wmin, W + Wmin; self.simple.SetRange(E1,E2)
       R = self.hps.Fit('simple','RSQN')
       E = fitParameters(self.simple); Prob = R.Prob()
-      print ' ╔ Simple Edge Fit: ═══════════════╤══════════════════════╤═════════════════════════════╗' 
-      print ' ║ Range from %6.1f to %6.1f keV │ E_beam = %7.2f MeV │   W_max = %9.3f keV     ║' % (E1, E2, self.BEPC[self.lepton]['E'], W)
-      print ' ╟─────────────────────────────────┴────────┬─────────────┴─────────────────────────────╢'
-      print ' ║ Edge amplitude : %10.3f ± %10.3f │ Edge Wmax:        %10.3f ± %10.3f ║' % (E['p0'], E['dp0'], E['p1'], E['dp1'])
-      print ' ║ Edge σW, keV:    %10.3f ± %10.3f │ Edge tilt pol1:   %10.7f ± %10.8f ║' % (E['p2'], E['dp2'], E['p3'], E['dp3'])
-      print ' ║ Edge tilt pol2:  %10.8f ± %10.8f │ Background:       %10.3f ± %10.3f ║' % (E['p4'], E['dp4'], E['p5'], E['dp5'])
-      print ' ╟──────────────────────────────────────────┼───────────────────────────────────────────╢'
-      print ' ║         χ2/NDF = %5.1f/%3d               │         Probability: %5.3f                ║' % (E['Chi2'], E['NDF'],Prob)
-      print ' ╚══════════════════════════════════════════╧═══════════════════════════════════════════╝\n'
+      print ' ╔ Simple Edge Fit: ═══════════╤══════════════════════╤═══════════════════════════╗' 
+      print ' ║ Range from %4.0f to %4.0f keV │ E_beam = %7.2f MeV │  W_max = %9.3f keV    ║' % (E1, E2, self.BEPC[self.lepton]['E'], W)
+      print ' ╟─────────────────────────────┴───────┬──────────────┴───────────────────────────╢'
+      print ' ║ Edge amplitude:  %6.1f ± %6.1f    │ Edge Wmax:       %10.3f ± %10.3f ║' % (E['p0'], E['dp0'], E['p1'], E['dp1'])
+      print ' ║ Edge σW, keV:    %6.2f ± %6.2f    │ Background:      %10.3f ± %10.3f ║' % (E['p2'], E['dp2'], E['p5'], E['dp5'])
+#      print ' ║ Edge σW, keV:    %10.3f ± %10.3f │ Edge tilt pol1:   %10.7f ± %10.8f ║' % (E['p2'], E['dp2'], E['p5'], E['dp5'])
+#      print ' ║ Edge tilt pol2:  %10.8f ± %10.8f │ Background:       %10.3f ± %10.3f ║' % (E['p4'], E['dp4'], E['p5'], E['dp5'])
+      print ' ╟─────────────────────────────────────┼──────────────────────────────────────────╢'
+      print ' ║         χ2/NDF = %5.1f/%3d          │        Probability: %5.3f                ║' % (E['Chi2'], E['NDF'],Prob)
+      print ' ╚═════════════════════════════════════╧══════════════════════════════════════════╝\n'
       OK = (E['p0']>self.MinAmp) and (E['dp0']/E['p0']<1.0) and (E['Chi2']/E['NDF']<10.0) and (E['p2']<100.0)
       self.Lg1.Clear(); self.Lg1.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (E['Chi2'], E['NDF'], Prob))
       self.Lg1.AddEntry(self.simple, '#omega_{max}  = %7.2f #pm %4.2f keV' % (E['p1'], E['dp1']), 'l')
       self.Lg1.AddEntry(self.simple, '#sigma_{edge} = %7.2f #pm %4.2f keV' % (E['p2'], E['dp2']), 'l')
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
-    self.hps.Draw(''); self.hps.GetXaxis().SetRangeUser(E1, E2); self.simple.Draw('SAME')
+    self.hps.Draw(''); self.hps.GetXaxis().SetRangeUser(E1-10, E2+10); self.simple.Draw('SAME')
     self.Lg1.Draw('SAME'); self.cc.Modified(); self.cc.Update()
     if OK: return E
-    raw_input('Bad Fit?')
-    print 'Simple fit: bad fit, bad amplitude, spread or χ2';  return False
+#    raw_input('Bad Fit?')
+    print 'Simple fit: bad fit, bad amplitude, spread or χ2';  
+    return False
 
     
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -109,17 +118,16 @@ class EDGE:
 
     Ec = fitParameters(self.comple); Prob = R.Prob();  
 
-    print ' ╔ Complex Edge Fit: ══════════════╤═════════════════════════╤══════════════════════════╗' 
-    print ' ║ Range from %6.1f to %6.1f keV │ Amplitude = %6.1f      │  W_max  = %9.3f keV  ║' % (E1, E2, E['p0'], E['p1'])
-    print ' ║        σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV │ σW  = %9.3f keV      ║' % (self.RR, self.dRR, self.RL, self.dRL, S)
-    print ' ╟─────────────────────────────────┴────────┬────────────────┴──────────────────────────╢'
-    print ' ║ Edge amplitude:  %10.3f ± %10.3f │ Edge wmax, keV:   %10.3f ± %10.3f ║' % (Ec['p0'], Ec['dp0'], Ec['p1'], Ec['dp1'])
-    print ' ║ Edge σW, keV:    %10.3f ± %10.3f │ Edge tilt pol1:   %10.7f ± %10.8f ║' % (Ec['p2'], Ec['dp2'], Ec['p3'], Ec['dp3'])
-    print ' ║ Edge tilt pol2:  %10.8f ± %10.8f │ Background:       %10.3f ± %10.3f ║' % (Ec['p4'], Ec['dp4'], Ec['p5'], Ec['dp5'])
-    print ' ║ HPGe σR, keV:    %10.3f ± %10.3f │ HPGe σL, keV:     %10.3f ± %10.3f ║' % (Ec['p7'], Ec['dp7'], Ec['p8'], Ec['dp8'])
-    print ' ╟──────────────────────────────────────────┼───────────────────────────────────────────╢'
-    print ' ║         χ2/NDF = %5.1f/%3d               │         Probability: %5.3f                ║' % (Ec['Chi2'], Ec['NDF'], Prob)
-    print ' ╚══════════════════════════════════════════╧═══════════════════════════════════════════╝\n'
+    print ' ╔ Complex Edge Fit: ══════════╤════════════════════════╤═════════════════════════╗' 
+    print ' ║ Range from %4.0f to %4.0f keV │ Amplitude = %6.1f     │  W_max = %9.3f keV  ║' % (E1, E2, E['p0'], E['p1'])
+    print ' ║    σR = %6.3f ± %5.3f keV  │  σL = %5.2f ± %4.2f keV │     σW  = %6.3f keV    ║' % (self.RR, self.dRR, self.RL, self.dRL, S)
+    print ' ╟─────────────────────────────┴────────┬───────────────┴─────────────────────────╢'
+    print ' ║ Edge amplitude: %8.1f ± %6.1f    │ Edge wmax, keV:   %8.3f ± %7.3f    ║' % (Ec['p0'], Ec['dp0'], Ec['p1'], Ec['dp1'])
+    print ' ║ Edge σW, keV:     %6.3f ± %5.3f     │ Background:       %8.1f ± %7.1f    ║' % (Ec['p2'], Ec['dp2'], Ec['p5'], Ec['dp5'])
+    print ' ║ HPGe σR, keV:     %6.3f ± %5.3f     │ HPGe σL, keV:  %10.3f ± %10.3f  ║' % (Ec['p7'], Ec['dp7'], Ec['p8'], Ec['dp8'])
+    print ' ╟──────────────────────────────────────┼─────────────────────────────────────────╢'
+    print ' ║         χ2/NDF = %5.1f/%3d           │          Probability: %5.3f             ║' % (Ec['Chi2'], Ec['NDF'], Prob)
+    print ' ╚══════════════════════════════════════╧═════════════════════════════════════════╝\n'
 
     self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (Ec['Chi2'], Ec['NDF'], Prob))
     self.Lg2.AddEntry(self.comple, '#omega_{max} =  %7.2f #pm %4.2f keV' % (Ec['p1'], Ec['dp1']), 'l')
@@ -154,13 +162,13 @@ class EDGE:
     st  = 'Measurement time '
     st += time.strftime('from %Y.%m.%d %H:%M:%S', time.localtime(utb))
     st += time.strftime(' to %Y.%m.%d %H:%M:%S.', time.localtime(ute))
-    print '\n ╔ %8s Beam Energy Determination:  ════════════════════════════════════════════════╗'      % self.lepton
-    print ' ║            BEPC beam energy = %8.3f ± %5.3f MeV was taken from database           ║'      % (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'])
-    print ' ║          %67s         ║' % (st)
-    print ' ║                                                                                      ║'
-    print ' ║ BEMS beam energy = %8.3f ± %5.3f MeV  (SR correction to IP +%5.3f MeV was added)  ║'      % (EB, dEB, SR)
-    print ' ║ BEMS beam spread =     %4.0f ±  %4.0f keV                                              ║' % (BS, dBS)
-    print ' ╚══════════════════════════════════════════════════════════════════════════════════════╝\n'
+    print '\n ╔ %8s Beam Energy Determination:  ══════════════════════════════════════════╗'      % self.lepton
+    print ' ║      BEPC beam energy = %8.3f ± %5.3f MeV was taken from database           ║'      % (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'])
+    print ' ║    %67s         ║' % (st)
+    print ' ║                                                                                ║'
+    print ' ║ BEMS beam energy = %8.3f ± %5.3f MeV  (SR correction +%5.3f MeV was added)  ║'      % (EB, dEB, SR)
+    print ' ║ BEMS beam spread =     %4.0f ±  %4.0f keV                                        ║' % (BS, dBS)
+    print ' ╚════════════════════════════════════════════════════════════════════════════════╝\n'
     self.Lg2.AddEntry(self.comple, 'E_{beam} = %8.2f #pm %5.2f MeV' % (EB, dEB), 'l')
     self.Lg2.AddEntry(self.comple, '#sigma_{E} = %4.0f #pm %4.0f keV' % (BS, dBS), 'l')
     self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
@@ -173,40 +181,33 @@ class EDGE:
   def GetCalibrationResults(self, t, wmax):
     for attempt in xrange(3):
       Scale = self.HPGe.Get_Calibration(t, wmax)
-      if not len(Scale): print 'Waiting for scale calibration results!'; time.sleep(20) 
-      else:              break
-    if not len(Scale):
-      print 'No valid calibration was found'
-      return 0, 0
-
-#    for k,v in Scale.iteritems():       print k,v
-#    Quality = []
-    for c in range(len(Scale['T'])):
-      if Scale['N'][c] == self.lepton: break
-#      if Scale['N'][c] == 'porridge':
-#        Quality.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
-#        Quality.append(c)
-
-#    if len(Quality)==0:   print 'No valid calibration was found'
-        
-#    TheBest = Quality.index(min(Quality))
+      L = len(Scale['R']) 
+      if L: break
+      else: print 'Waiting 20s for calibration results...';   time.sleep(20) 
+    if L == 1: c = 0
+    elif L >1:
+      Q = [Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c] for c in range(L)]
+#      for c in range(L): Q.append(Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c])
+      if len(Q)==0:    print 'No valid calibration was found'; return 0, 0
+      c = Q.index(min(Q))
+    else:              print 'No valid calibration was found'; return 0, 0
     zero, gain         = Scale['Z'][c], Scale['G' ][c]
     self.dW            =                Scale['dW'][c] # linear calibration statistical error, keV
     self.SC, self.dSC  = Scale['C'][c], Scale['dC'][c] # PB-5  scale correction and its error, keV
     self.RR, self.dRR  = Scale['R'][c], Scale['dR'][c] # Right resolution sigma and its error, keV
     self.RL, self.dRL  = Scale['L'][c], Scale['dL'][c] # Left  resolution sigma and its error, keV
-    print Scale['N'][c]
-    print ' ╔ HPGe Calibration: ═══════════════════════════════════════════════════════════════════╗' 
-    print ' ║ W_max  = %9.3f keV     σR = %6.3f ± %5.3f keV     σL = %6.3f ± %5.3f keV       ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
-    print ' ╚══════════════════════════════════════════════════════════════════════════════════════╝\n'
+#    print Scale['N'][c]
+    print ' ╔ HPGe calibration: %15s ══════════════════╤══════════════════════════╗' % (self.HPGe.outfile)
+    print ' ║  W_max  = %9.3f keV  │ σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV  ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
+    print ' ╚══════════════════════════╧══════════════════════════╧══════════════════════════╝\n'
     return zero, gain  
-    
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Wmax_expect(self):
-    Eo = 1.e+3*self.BEPC[self.lepton]['E'] + self.ETuner
+    self.BEPC[self.lepton]['E'] += self.ETuner
+    Eo = 1.e+3*self.BEPC[self.lepton]['E']
     k  = 4.*Eo*self.wo/self.me**2; 
     return Eo*k/(1.+k)
-      
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Save_Files(self, results):
@@ -219,7 +220,7 @@ class EDGE:
       with open('P.results','a') as f:  f.write(S)
     
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Save_DB(self, results):
+  def Save_DB(self, (t, dt, EB, dEB, BS, dBS)):
     print 'Saving (%s) to BEPC database' % (self.lepton)
     from EpicsCA import caput
     if 'lectron' in self.lepton:
@@ -233,7 +234,7 @@ class EDGE:
   def Save_WWW(self):
     print 'Sending to web-server...'
     self.cc.SaveAs('Energy.png')
-    os.system('./ourweb.py')
+    os.system('ourweb.py')
     time.sleep(10)
     if   'lectron' in self.lepton: rfile='/home/BEMSystem/public_html/images/E.png'
     elif 'ositron' in self.lepton: rfile='/home/BEMSystem/public_html/images/P.png'
@@ -244,9 +245,11 @@ class EDGE:
       ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
       ssh.connect('docbes3.ihep.ac.cn', username='BEMSystem', password='88230944')
       ftp = ssh.open_sftp()
-      ftp.put('Energy.png', rfile)
-      ftp.put('in-time.png', '/home/BEMSystem/public_html/images/in-time.png')
-      ftp.put('index.html',  '/home/BEMSystem/public_html/index.html')
+      print ftp
+      print 'OK'
+      ftp.put('/home/ems/Analysis/2017/Energy.png', rfile)
+      ftp.put('/home/ems/Analysis/2017/in-time.png', '/home/BEMSystem/public_html/images/in-time.png')
+      ftp.put('/home/ems/Analysis/2017/index.html',  '/home/BEMSystem/public_html/index.html')
       ftp.close()
       ssh.close()
     except:
@@ -355,8 +358,6 @@ class BEMS_DB:
     A = np.fromiter(T['Ep'], np.float);  R['positron']['E'], R['positron']['dE']  = 1000.*A.mean(), 1000.*A.std()
     A = np.fromiter(T['Ip'], np.float);  R['positron']['I'], R['positron']['dI']  =       A.mean(),       A.std()
     return R
-
-
 
 
 def fitParameters(fitf):

@@ -59,8 +59,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.ERG      = ROOT.TMultiGraph(); self.ERG.SetTitle('#sigma_{E} / E [%]')
     self.eres_C   = ROOT.TF1('eres_C', ResolutionModel(), -self.emax, self.emax, 4) # combined resolution model [%]
     self.eres_C.SetParameters(1.0,  0.24, 0.000, 100.0); self.eres_C.SetLineColor(self.Colors[0])
-    self.eres_C.SetParLimits( 0,    0.40, 10.00);        self.eres_C.SetParLimits(1, 0.10, 0.500)
-    self.eres_C.SetParLimits( 2,    0.00, 0.001);        #self.eres_C.SetParLimits(3, 0.00, 10000.)
+    self.eres_C.SetParLimits( 0,    0.40, 10.00);        self.eres_C.SetParLimits(1, 0.05, 0.500)
+    self.eres_C.SetParLimits( 2,    0.00, 0.001);        self.eres_C.SetParLimits(3, -5000.00, 5000.)
     self.pulser   = ROOT.TF1('pulser', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
     self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[2])
     self.InitGraphics()    

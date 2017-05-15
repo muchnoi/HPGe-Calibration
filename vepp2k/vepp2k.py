@@ -60,6 +60,7 @@ class EDGE(Constants):
       if abs(self.ETuner)<10.0:   self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
       else:                       self.Eo = self.ETuner                           # [MeV]
       if self.Radius:             self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T] 
+      elif not self.VEPP2K['B']:  self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T] 
       elif abs(self.BTuner)<0.1:  self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
       else:                       self.Bo = self.BTuner                           # [T]
       k    = 4.e+6*self.Eo*Constants.wo/Constants.me**2;                          # [eV*eV / eV**2]
@@ -119,7 +120,7 @@ class EDGE(Constants):
       self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
     
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
-    self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1, E2)
+    self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-50, E2+50)
     self.cc.Modified(); self.cc.Update()
 
     if OK: 
@@ -130,7 +131,11 @@ class EDGE(Constants):
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self,W,LBK):
-    
+    try: 
+      self.convol.Delete(), self.comple.Delete()
+    except AttributeError:
+      print 'nothing to delete...'
+      pass
     K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
     self.convol = ROOT.TF1Convolution('simple', 'spreso');     self.convol.SetNofPointsFFT(1000)
     self.comple = ROOT.TF1('comple', self.convol, E1, E2, 10); self.comple.SetNpx(1000)
@@ -307,11 +312,11 @@ class EMSResults:
       g.SetMarkerColor(ROOT.kRed); g.SetMarkerStyle(20); g.GetYaxis().SetDecimals()
     self.rc = ROOT.TCanvas('rc','BEMS results for VEPP-2000', 5, 5, 1000, 1200)
     self.rc.Divide(1,3)
-    self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Draw('AP'); 
+    self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Fit('pol0'); self.BE.Draw('AP'); 
     self.BE.GetXaxis().SetTitle('time');         self.BE.GetYaxis().SetTitle('Beam energy [MeV]')
-    self.rc.cd(2); self.rc.GetPad(2).SetGrid();  self.BF.Draw('AP'); 
+    self.rc.cd(2); self.rc.GetPad(2).SetGrid();  self.BF.Fit('pol0'); self.BF.Draw('AP'); 
     self.BF.GetXaxis().SetTitle('time');         self.BF.GetYaxis().SetTitle('Bending field [T]')
-    self.rc.cd(3); self.rc.GetPad(3).SetGrid();  self.BS.Draw('AP'); 
+    self.rc.cd(3); self.rc.GetPad(3).SetGrid();  self.BS.Fit('pol0'); self.BS.Draw('AP'); 
     self.BS.GetXaxis().SetTitle('time');         self.BS.GetYaxis().SetTitle('Beam energy spread [keV]')
     self.rc.Modified()
     self.rc.Update()

@@ -6,7 +6,7 @@ def Usage():
   print '''
  ╔ Python script to process HPGe spectra. © 2005-2017 N.Yu.Muchnoi ═══════════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update: February 8, 2017  │ ║
+ ║ Usage: %0000000012s [options]               │ Last update:     May 18, 2017  │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -88,7 +88,7 @@ class ToDo:
       elif opt in ("-l", "--list")       : self.listonly  = True;     self.online = False
       elif opt in (      "--edge")       : self.edge      = True;                          self.tokeV  = False
       elif opt in (      "--escan")      : self.escan     = True;     self.online = False
-      elif opt in ("-c", "--cfg")        : self.cfg_file  = arg;  
+      elif opt in ("-c", "--cfg")        : self.cfg_file  = arg;      self.online = False
     cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file') and not S: self.scalefile = cfg.get('scale', 'file')
     if not self.online:  
@@ -210,13 +210,14 @@ class DataFile:
       H,S = divmod(t,3600); M,S = divmod(S,60)
       return time.mktime(time.strptime("%8d%02d%02d%02d" % (d, H, M, S), "%Y%m%d%H%M%S")) # - self.TZ
 
-    self.PB5, self.utb, self.ute, self.Tlive, self.pType = [], 0, 0, 0, 'None'
+    self.utb, self.ute, self.Tlive, self.pType = 0, 0, 0, 'None'
     HAT, counts  = {}, []
     with gzip.open(ifile,'rb') as fp: DATA = fp.readlines()
     for line in DATA:
       if line[0] == '#': 
         T = line[1:].strip().split()
         if 'PB5 VOLTS' in line:
+          self.PB5 = []
           for v in T[2:]: self.PB5.append(float(v))
         else:    
           try:                HAT[T[0]] = float(T[1])

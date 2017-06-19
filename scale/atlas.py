@@ -4,10 +4,14 @@ class Atlas:
     self.atlas={}
 
 #    self.atlas['  H1 ']   =   [{'Key':'0', 'W':2223.250, 'dW':.050, 'CC':False,   'RC':True}]
-    self.atlas['Mn56 ']   =   [{'Key':'0', 'W': 846.754, 'dW':.020, 'CC':False,  'RC':False}]
-    self.atlas[' O16 ']   =   [{'Key':'0', 'W':6129.266, 'dW':.054, 'CC':False,  'RC':False}]
     self.atlas[' K40 ']   =   [{'Key':'0', 'W':1460.750, 'dW':.060, 'CC':False,  'RC':False}]
 #    self.atlas['annig']   =   [{'Key':'0', 'W': 510.998, 'dW':.060, 'CC':False,  'RC':False}]
+
+#    self.atlas[' O16 ']   =   [{'Key':'0', 'W':6128.630, 'dW':.040, 'CC':False,  'RC':False}]
+    self.atlas[' O16 ']   =   [{'Key':'0', 'W':6129.075, 'dW':.05, 'CC':False,  'RC':False}]
+#    self.atlas['Ale81']   =   [{'Key':'0', 'W':6129.240, 'dW':.050, 'CC':False,  'RC':False}]
+#    self.atlas['She82']   =   [{'Key':'0', 'W':6129.142, 'dW':.032, 'CC':False,  'RC':False}]
+#    self.atlas['Ken86']   =   [{'Key':'0', 'W':6129.119, 'dW':.040, 'CC':False,  'RC':False}]
     
 # According to Gamma-ray energy Standards
 #    self.atlas['Cs137']   =   [{'Key':'0', 'W': 661.657, 'dW':.003, 'CC':True,   'RC':True}]
@@ -25,6 +29,14 @@ class Atlas:
 #    self.atlas['Tl208'].append({'Key':'1', 'W': 241.000, 'dW':.100, 'CC':True,  'RC':True })
 #    self.atlas['Tl208'].append({'Key':'2', 'W': 277.400, 'dW':.100, 'CC':True,  'RC':True })
 #    self.atlas[' K40 ']   =   [{'Key':'0', 'W':1460.830, 'dW':.100, 'CC':True,  'RC':True}]
+
+
+    self.atlas['Co56 ']   =   [{'Key':'0', 'W':  846.764, 'dW':.020, 'CC':False,  'RC':False}]
+#    self.atlas['Co56 '].append({'Key':'1', 'W': 1238.274, 'dW':.020, 'CC':False,  'RC':False})
+
+    self.atlas['Mn56 ']   =   [{'Key':'0', 'W':  846.764, 'dW':.020, 'CC':False,  'RC':False}]
+#    self.atlas['Mn56 '].append({'Key':'1', 'W': 1810.726, 'dW':.040, 'CC':False,  'RC':False})
+
 
     self.atlas['Pb212'] = []
 #    self.atlas['Pb212'].append({'Key':'0', 'W': 238.632, 'dW':.002, 'I':43.3, 'dI':0.4, 'CC':False, 'RC':False})

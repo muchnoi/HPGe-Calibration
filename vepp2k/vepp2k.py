@@ -59,7 +59,7 @@ class EDGE(Constants):
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Go(self, UTB, UTE, hps, filechain):
-    self.hps = hps.Clone(); nbins = hps.GetNbinsX(); self.hps.GetXaxis().SetTitle('E_{#gamma}, keV')
+    self.hps = hps.Clone(); nbins = hps.GetNbinsX(); self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
     self.VEPP2K = VEPP2K_DB().GetRunInfo(filechain)
     if self.VEPP2K:
       print "V2K set beam energy: %7.2f MeV " % self.VEPP2K['E']
@@ -124,6 +124,7 @@ class EDGE(Constants):
       OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5) 
       self.Legend.Clear(); 
       self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
+    else: OK = False  
     
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
     self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-50, E2+50)
@@ -186,6 +187,7 @@ class EDGE(Constants):
       self.Legend.AddEntry(self.comple, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), 'l')
       self.Legend.AddEntry(self.comple, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), 'l')
       self.Legend.Draw('SAME')
+    else: OK = False
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
     
     if OK: return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS]}

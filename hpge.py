@@ -6,7 +6,7 @@ def Usage():
   print '''
  ╔ Python script to process HPGe spectra. © 2005-2017 N.Yu.Muchnoi ═══════════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update:     May 18, 2017  │ ║
+ ║ Usage: %0000000012s [options]               │ Last update:    June 05, 2017  │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -172,7 +172,10 @@ class Histogram:
           print 'Skip:', flist[0]
         flist.pop(0)
 
-      for nbin in range(self.nbins):     
+      threshold = 1000
+      for nbin in range(threshold):     
+        self.hps.SetBinContent(nbin, 0); self.hps.SetBinError(nbin, 0)
+      for nbin in range(threshold, self.nbins):     
         N = self.hps.GetBinContent(nbin); self.hps.SetBinError(nbin, (N + (self.cdif*N)**2)**0.5 )
         
       H,S = divmod(self.LiveT, 3600); M,S = divmod(S, 60)

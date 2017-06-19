@@ -49,7 +49,7 @@ class EDGE:
       if gain:
         nbins = hps.GetNbinsX(); hps.SetBins(nbins, zero, zero + gain * nbins)
         self.hps = hps.Clone(); self.hps.Rebin(self.Merger)
-        self.hps.GetXaxis().SetTitle('E_{#gamma}, keV');
+        self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]');
         Edge = self.fitEdgeSimple(Wmax, self.Ranger)
         if Edge:
          Edge = self.fitEdgeComplex(Edge, self.Ranger)

@@ -73,7 +73,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
   def Do(self, utb, ute, pb5, hps, ptype):
     self.UTB, self.UTE, self.hps, self.PB5, self.ptype = utb, ute, hps, pb5, ptype
     self.nbins = self.hps.GetNbinsX()
-    self.hps.GetXaxis().SetTitle('E_{#gamma}, keV')
+    self.hps.GetXaxis().SetTitle(' E_{#gamma} [keV]')
     self.hps.SetBins(self.nbins, self.zero, self.zero + self.gain * self.nbins)
     self.PB5lines()
     self.findPeaks()
@@ -161,6 +161,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       if ALREADY: # if peak was fitted already:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
         V = p['shape']
         p0,p2,p3,p4,p5 = V['p0'], V['p2'], V['p3'], V['p4'], V['p5']
+        if not PB5: p1 = V['p1']
       else:   # if a peak was not fitted yet:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
         p0,   p2 = p['A'], 0.01 * p1 * (self.pulser.Eval(p1) if PB5 else self.eres_C.Eval(p1))
         p3,p4,p5 = p2,  0.00,  p['B']
@@ -207,8 +208,25 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     H = self.hps.DrawCopy();  H.GetXaxis().SetRangeUser(L, R)
     H.SetNameTitle('Spectrum', '%5s (%.3f keV) #chi^{2}/ndf = %.1f/%s' % (name, p['E'], p['shape']['Chi2'], p['shape']['NDF']))
     self.asps.DrawCopy('SAME')
-#    self.cv.Modified(); self.cv.Update()
-#    self.PADS[npad].SaveAs('%.0fkeV.pdf' % p['E'])
+    self.cv.Modified(); self.cv.Update()
+#    self.PADS[npad].SaveAs('%.0fkeV.png' % p['E'])
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def Save_Peak(self, p, VLEVO, VPRAVO):
+    C, SR, SL = p['shape']['p1'], p['shape']['p2'], p['shape']['p3']
+    L, R, N, M = C-SL*(VLEVO+1), C+SR*(VPRAVO+1), '', ''
+    for c in p['name'][0:5]:
+      if   c.isdigit(): N+=c
+      elif c.isspace(): pass
+      else:             M+=c
+    name  = '^{%s}%s' % (N,M)
+    ct = ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 1002)
+    ct.cd(); ct.SetGrid(); ct.SetLogy(); ct.GetYaxis.SetMoreLogLabels()
+    H = self.hps.DrawCopy();  H.GetXaxis().SetRangeUser(L, R)
+    H.SetNameTitle('Spectrum', '%5s (%.3f keV) #chi^{2}/ndf = %.1f/%s' % (name, p['E'], p['shape']['Chi2'], p['shape']['NDF']))
+    self.asps.DrawCopy('SAME')
+    ct.Modified(); ct.Update()
+    ct.SaveAs('%.0fkeV.pdf' % p['E'])
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -261,7 +279,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     xmin, xmax, ymin, ymax = MultiGraphLimits(self.NLG)
     self.PADS[0].cd();  self.PADS[0].Clear();  self.PADS[0].SetGrid()
     self.NLG.Draw('AP');  
-    self.NLG.GetXaxis().SetLimits(   xmin, xmax); self.NLG.GetXaxis().SetTitle('E_{#gamma}, keV')
+    self.NLG.GetXaxis().SetLimits(   xmin, xmax); self.NLG.GetXaxis().SetTitle(' E_{#gamma} [keV]')
     self.NLG.GetYaxis().SetRangeUser(ymin, ymax); self.NLG.GetYaxis().SetDecimals()
     self.Lg1.Draw('SAME')
     if self.PB5: self.SplineU.Draw('SAME')
@@ -318,7 +336,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.PADS[1].cd(); self.PADS[1].Clear(); self.PADS[1].SetGrid()
     self.ERG.Draw('AP'); self.eres_C.DrawCopy('SAME'); self.Lg2.Draw('SAME')
     if self.PB5:         self.pulser.DrawCopy('SAME')
-    self.ERG.GetXaxis().SetLimits( -xmax, xmax); self.ERG.GetXaxis().SetTitle('E_{#gamma}, keV');  
+    self.ERG.GetXaxis().SetLimits( -xmax, xmax); self.ERG.GetXaxis().SetTitle(' E_{#gamma} [keV]');  
     self.ERG.GetYaxis().SetRangeUser(0.0, ymax); self.ERG.GetYaxis().SetDecimals()
     self.cv.Modified(); self.cv.Update()
     return

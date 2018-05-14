@@ -8,7 +8,7 @@ from hpge import DataFile, Histogram
 
 class Energy_Scan:
   IP = 2.0*ROOT.TMath.Cos(0.011)
- 
+
   def Go(self, flist, todo):
     T, Emin, Emax = DataFile(), 1830.0, 1850.0
     ngood, TABLE = 0, {'file':[], 't':[], 'dt':[], 'E':[], 'dE':[], 'Se':[], 'Sp':[]}
@@ -39,8 +39,8 @@ class Energy_Scan:
     Points_Names, Energy_Points = [], [ [ TABLE['file'][n] ] ]
     Points_Names.append('%.3f MeV' % TABLE['E'][n])
     while n < ngood-1:
-      Condition1 = abs(TABLE['E'][n] - TABLE['E'][n+1]) < (TABLE['dE'][n] + TABLE['dE'][n+1]) 
-      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 10000 # separate points with large time gaps
+      Condition1 = abs(TABLE['E'][n] - TABLE['E'][n+1]) < (TABLE['dE'][n] + TABLE['dE'][n+1])
+      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 4000 # separate points with large time gaps
       if Condition1 and Condition2:
         Energy_Points[PointN].append(TABLE['file'][n+1])
       else:
@@ -48,7 +48,7 @@ class Energy_Scan:
         Points_Names.append('%.3f MeV' % TABLE['E'][n+1])
       n += 1
 
-    print 'Initially:'  
+    print 'Initially:'
     for PointN in range(len(Energy_Points)):
       print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
 
@@ -58,24 +58,24 @@ class Energy_Scan:
       Ne = len([fn for fn in Energy_Points[p] if 'elec' in fn])
       Np = len([fn for fn in Energy_Points[p] if 'posi' in fn])
       if len(Energy_Points[p]) < 3 or not (Ne and Np):
-        for el in Energy_Points[p]: 
+        for el in Energy_Points[p]:
           rem_rec = TABLE['file'].index(el)
           for key in TABLE.keys(): TABLE[key].pop(rem_rec)
         Energy_Points.pop(p);      Points_Names.pop(p)
         tnp -= 1
       else:
         p += 1
-    
+
     self.Show_Points(TABLE)
 
-    print 'After selection:'  
+    print 'After selection:'
     for PointN in range(len(Energy_Points)):
       print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
 
     raw_input( '%d energy scan points have been founded' % PointN )
 
     self.H = Histogram(todo)
-    Bs_elec, Bs_posi = [], []    
+    Bs_elec, Bs_posi = [], []
     for PointN in range(len(Energy_Points)):
       print '\nPoint %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
       if todo.edge:
@@ -86,18 +86,18 @@ class Energy_Scan:
           tmin, tmax = min(E[0] - E[1], P[0] - P[1]), max(E[0] + E[1], P[0] + P[1])
           t   , dt      = 0.5*(tmin + tmax), 0.5*(tmax - tmin)
           E_cms, dE_cms = self.IP * (E[2]*P[2])**0.5, (E[3]**2 + P[3]**2)**0.5
-          S_cms  = (E[4]**2+P[4]**2)**0.5; 
+          S_cms  = (E[4]**2+P[4]**2)**0.5;
           dS_cms = ((E[4]*E[5])**2 + (P[4]*P[5])**2)**0.5/S_cms
-          S_cms  = 0.001*S_cms 
-          dS_cms = 0.001*dS_cms 
-          
-          outs = '%10d  %5d  %8.3f  %5.3f  %6.3f  %5.3f # point %2d (%s)\n' % (t, dt, E_cms, dE_cms, S_cms, dS_cms, PointN, Points_Names[PointN]) 
+          S_cms  = 0.001*S_cms
+          dS_cms = 0.001*dS_cms
+
+          outs = '%10d  %5d  %8.3f  %5.3f  %6.3f  %5.3f # point %2d (%s)\n' % (t, dt, E_cms, dE_cms, S_cms, dS_cms, PointN, Points_Names[PointN])
           with open('SCAN.results','a') as f: f.write(outs)
 #        raw_input('Point %d energy measurement is ready' % PointN)
-      else:  
+      else:
         flist = [el for el in Energy_Points[PointN]];  self.H.nfile = len(flist);  self.H.Go(flist)
         print 'Point %d scale calibration is ready (porridge)'  % PointN
-    
+
     if todo.edge:
       Se = np.fromiter(Bs_elec, np.float)
       Sp = np.fromiter(Bs_posi, np.float)
@@ -105,14 +105,14 @@ class Energy_Scan:
       outs += "# e- beam spread = %.0f ± %.0f keV\n" % (Se.mean(), Se.std())
       outs += "# e+ beam spread = %.0f ± %.0f keV\n" % (Sp.mean(), Sp.std())
       with open('SCAN.results','a') as f: f.write(outs)
-      
 
 
-        
-    raw_input('So what?')  
 
 
-  def Show_Points(self,TABLE):    
+    raw_input('So what?')
+
+
+  def Show_Points(self,TABLE):
     TE, TP = {'t':[], 'dt':[], 'E':[], 'dE':[]}, {'t':[], 'dt':[], 'E':[], 'dE':[]}
     for n in range(len(TABLE['file'])):
       if   'elec' in TABLE['file'][n]:
@@ -141,8 +141,8 @@ class Energy_Scan:
     self.GSE = GSE
     self.GSP = GSP
 
-    self.cfh.cd(1); self.cfh.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME'); 
-    self.cfh.cd(2); self.cfh.SetGrid(); self.GSE.Draw('APL'); self.GSP.Draw('PLSAME'); 
-    
-    self.cfh.Modified(); self.cfh.Update()  
-    
+    self.cfh.cd(1); self.cfh.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME');
+    self.cfh.cd(2); self.cfh.SetGrid(); self.GSE.Draw('APL'); self.GSP.Draw('PLSAME');
+
+    self.cfh.Modified(); self.cfh.Update()
+

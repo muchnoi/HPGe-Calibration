@@ -5,10 +5,10 @@ import numpy as np
 from scale.isotopes import Isotopes
 from hpge import DataFile, Histogram
 ssh = True
-try: 
+try:
   import paramiko
 except ImportError:
-  ssh = False 
+  ssh = False
   print 'paramiko is unavailable'
 
 
@@ -28,13 +28,13 @@ class EDGE:
     self.ETuner  =               cfg.getfloat('edge', 'EbepcTuner')
     self.Asymme  =               cfg.getfloat('edge', 'Asymmetry')
     self.SaveDB  =         ssh and cfg.getint('edge', 'SaveForDB')
-    
+
     self.cc      = ROOT.TCanvas('cc','BEMS for BEPC-II', 800, 600, 800, 600); # self.cc.Divide(1,2)
     self.const   = ROOT.TF1('const', '[0]')
     self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7); self.simple.SetLineColor(ROOT.kRed)
     self.comple  = ROOT.TF1('comple', EdgeComple(), 0, 1, 9); self.comple.SetLineColor(ROOT.kAzure)
-    self.Lg1     = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC'); 
-    self.Lg2     = ROOT.TLegend(0.55, 0.49, 0.98, 0.69, '', 'brNDC'); 
+    self.Lg1     = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC');
+    self.Lg2     = ROOT.TLegend(0.55, 0.49, 0.98, 0.69, '', 'brNDC');
     self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -50,6 +50,11 @@ class EDGE:
         nbins = hps.GetNbinsX(); hps.SetBins(nbins, zero, zero + gain * nbins)
         self.hps = hps.Clone(); self.hps.Rebin(self.Merger)
         self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]');
+        # get rid of spikes:
+        for spike in self.EP:
+          lo = 1 + int((spike - zero - 3 * self.RR)/(gain*float(self.Merger)))
+          hi = 1 + int((spike - zero + 3 * self.RL)/(gain*float(self.Merger)))
+          for ch in range(lo, hi): self.hps.SetBinContent(ch, 0.0); self.hps.SetBinError(ch, 0.0)
         Edge = self.fitEdgeSimple(Wmax, self.Ranger)
         if Edge:
          Edge = self.fitEdgeComplex(Edge, self.Ranger)
@@ -57,11 +62,11 @@ class EDGE:
            R = self.Beam_Energy(UTB,UTE)
            if R and self.SaveDB:
              self.Save_Files(R)
-             self.Save_DB(R)
-             self.Save_WWW()
+#             self.Save_DB(R)
+#             self.Save_WWW()
            return R
     else: return False
-           
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeSimple(self,W,LBK):
     K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin; self.simple.SetRange(E1, E2)
@@ -77,7 +82,7 @@ class EDGE:
       W = self.simple.GetParameter(1);   E1, E2 = W - LBK*Wmin, W + Wmin; self.simple.SetRange(E1,E2)
       R = self.hps.Fit('simple','RSQN')
       E = fitParameters(self.simple); Prob = R.Prob()
-      print ' ╔ Simple Edge Fit: ═══════════╤══════════════════════╤═══════════════════════════╗' 
+      print ' ╔ Simple Edge Fit: ═══════════╤══════════════════════╤═══════════════════════════╗'
       print ' ║ Range from %4.0f to %4.0f keV │ E_beam = %7.2f MeV │  W_max = %9.3f keV    ║' % (E1, E2, self.BEPC[self.lepton]['E'], W)
       print ' ╟─────────────────────────────┴───────┬──────────────┴───────────────────────────╢'
       print ' ║ Edge amplitude:  %6.1f ± %6.1f    │ Edge Wmax:       %10.3f ± %10.3f ║' % (E['p0'], E['dp0'], E['p1'], E['dp1'])
@@ -96,29 +101,29 @@ class EDGE:
     self.Lg1.Draw('SAME'); self.cc.Modified(); self.cc.Update()
     if OK: return E
 #    raw_input('Bad Fit?')
-    print 'Simple fit: bad fit, bad amplitude, spread or χ2';  
+    print 'Simple fit: bad fit, bad amplitude, spread or χ2';
     return False
 
-    
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComplex(self,E,LBK):
     W = E['p1']
     K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin; self.comple.SetRange(E1, E2)
     S = E['p2']**2 - self.RR**2; S = 1.0 if S<0.0 else S**0.5 # estimated influence of beam energy spread to the edge width
-    
+
     Ebeam = self.BEPC[self.lepton]['E'] # MeV
     if self.Asymme>=1.0: self.RL = self.Asymme*self.RR
     # Amplitude | Position | Sigma | edge tilt ~x | edge tilt ~x^2 | Background | Background Slope | Sigma_R | Sigma_L |
     self.comple.SetParameters(E['p0'], E['p1'], S, E['p3'], E['p4'], E['p5'], E['p6'], self.RR, self.RL);
-    FIXED = [5,6,7,8]; 
+    FIXED = [5,6,7,8];
     for n in FIXED: V = self.comple.GetParameter(n); self.comple.FixParameter(n,V)
     R = self.hps.Fit('comple','RSQN')
     if R.Status(): return False
     for n in FIXED: self.comple.ReleaseParameter(n)
 
-    Ec = fitParameters(self.comple); Prob = R.Prob();  
+    Ec = fitParameters(self.comple); Prob = R.Prob();
 
-    print ' ╔ Complex Edge Fit: ══════════╤════════════════════════╤═════════════════════════╗' 
+    print ' ╔ Complex Edge Fit: ══════════╤════════════════════════╤═════════════════════════╗'
     print ' ║ Range from %4.0f to %4.0f keV │ Amplitude = %6.1f     │  W_max = %9.3f keV  ║' % (E1, E2, E['p0'], E['p1'])
     print ' ║    σR = %6.3f ± %5.3f keV  │  σL = %5.2f ± %4.2f keV │     σW  = %6.3f keV    ║' % (self.RR, self.dRR, self.RL, self.dRL, S)
     print ' ╟─────────────────────────────┴────────┬───────────────┴─────────────────────────╢'
@@ -138,19 +143,19 @@ class EDGE:
     print ' Wmax: %7.2f ± %4.2f keV (symmetric fit)'      % (E['p1'], E['dp1'])
     Wmax, dWmax = Ec['p1'],  Ec['dp1']
     print ' Wmax: %7.2f ± %4.2f keV (asymmetric fit)'     % (Wmax, dWmax)
-    Wmax, dWmax = Wmax-self.SC, (dWmax**2+self.dSC**2)**0.5;  
+    Wmax, dWmax = Wmax-self.SC, (dWmax**2+self.dSC**2)**0.5;
     print ' Wmax: %7.2f ± %4.2f keV (spline correction )' % (Wmax, dWmax)
 
-#    outs = '%10d  %5d  %4d  %4d   %4d  %4d # point %2d (%s)\n' % (t, dt, int(E[4]), int(E[5]), int(P[4]), int(P[5]), PointN, Points_Names[PointN]) 
-#    outs = '%6.3f  %5.3f  %7.5f  %7.5f  %9.7f  %9.7f\n' % (Ec['p2'], Ec['dp2'], Ec['p3'], Ec['dp3'], Ec['p4'], Ec['dp4']) 
+#    outs = '%10d  %5d  %4d  %4d   %4d  %4d # point %2d (%s)\n' % (t, dt, int(E[4]), int(E[5]), int(P[4]), int(P[5]), PointN, Points_Names[PointN])
+#    outs = '%6.3f  %5.3f  %7.5f  %7.5f  %9.7f  %9.7f\n' % (Ec['p2'], Ec['dp2'], Ec['p3'], Ec['dp3'], Ec['p4'], Ec['dp4'])
 #    with open('%8s.dat' % self.lepton,'a') as f: f.write(outs)
-    
+
     self.Wmax, self.dWmax = Wmax, dWmax
     self.BsCt, self.dBsCt = Ec['p2'], Ec['dp2']
     BAD = Ec['p0']<self.MinAmp or Ec['dp0']/Ec['p0']>1.0 or Ec['Chi2']/Ec['NDF']>10.0
     if BAD:  print 'Complex fit: bad amplitude, spread or χ2';  return False
     return Ec
-    
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Beam_Energy(self,utb,ute):
     def Eo(wmax): return 0.5 * wmax * (1.0 + (1.0 + self.me**2/wmax/self.wo)**0.5)
@@ -181,9 +186,9 @@ class EDGE:
   def GetCalibrationResults(self, t, wmax):
     for attempt in xrange(3):
       Scale = self.HPGe.Get_Calibration(t, wmax)
-      L = len(Scale['R']) 
+      L = len(Scale['R'])
       if L: break
-      else: print 'Waiting 20s for calibration results...';   time.sleep(20) 
+      else: print 'Waiting 20s for calibration results...';   time.sleep(20)
     if L == 1: c = 0
     elif L >1:
       Q = [Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c] for c in range(L)]
@@ -196,17 +201,18 @@ class EDGE:
     self.SC, self.dSC  = Scale['C'][c], Scale['dC'][c] # PB-5  scale correction and its error, keV
     self.RR, self.dRR  = Scale['R'][c], Scale['dR'][c] # Right resolution sigma and its error, keV
     self.RL, self.dRL  = Scale['L'][c], Scale['dL'][c] # Left  resolution sigma and its error, keV
+    self.EP            = Scale['X'][c]                 # exclude peaks, keV
 #    print Scale['N'][c]
     print ' ╔ HPGe calibration: %15s ══════════════════╤══════════════════════════╗' % (self.HPGe.outfile)
     print ' ║  W_max  = %9.3f keV  │ σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV  ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
     print ' ╚══════════════════════════╧══════════════════════════╧══════════════════════════╝\n'
-    return zero, gain  
+    return zero, gain
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Wmax_expect(self):
     self.BEPC[self.lepton]['E'] += self.ETuner
     Eo = 1.e+3*self.BEPC[self.lepton]['E']
-    k  = 4.*Eo*self.wo/self.me**2; 
+    k  = 4.*Eo*self.wo/self.me**2;
     return Eo*k/(1.+k)
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -214,11 +220,11 @@ class EDGE:
     print 'Saving (%s) to history file' % (self.lepton)
     S = results + (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'], self.BEPC[self.lepton]['I'], self.BEPC[self.lepton]['dI'])
     S = '%10d  %5d  %8.3f  %5.3f  %5.0f  %5.0f  %7.2f  %4.2f  %3.0f  %3.0f\n' % S
-    if   'electron' in self.lepton:  
+    if   'electron' in self.lepton:
       with open('E.results','a') as f:  f.write(S)
-    elif 'positron' in self.lepton:  
+    elif 'positron' in self.lepton:
       with open('P.results','a') as f:  f.write(S)
-    
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Save_DB(self, (t, dt, EB, dEB, BS, dBS)):
     print 'Saving (%s) to BEPC database' % (self.lepton)
@@ -239,7 +245,7 @@ class EDGE:
     if   'lectron' in self.lepton: rfile='/home/BEMSystem/public_html/images/E.png'
     elif 'ositron' in self.lepton: rfile='/home/BEMSystem/public_html/images/P.png'
     else:                          rfile='/home/BEMSystem/public_html/images/B.png'
-#    if not self.prompt: 
+#    if not self.prompt:
     try:
       ssh = paramiko.SSHClient()
       ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -247,9 +253,9 @@ class EDGE:
       ftp = ssh.open_sftp()
       print ftp
       print 'OK'
-      ftp.put('/home/ems/Analysis/2017/Energy.png', rfile)
-      ftp.put('/home/ems/Analysis/2017/in-time.png', '/home/BEMSystem/public_html/images/in-time.png')
-      ftp.put('/home/ems/Analysis/2017/index.html',  '/home/BEMSystem/public_html/index.html')
+      ftp.put('./Energy.png', rfile)
+      ftp.put('./in-time.png', '/home/BEMSystem/public_html/images/in-time.png')
+      ftp.put('./index.html',  '/home/BEMSystem/public_html/index.html')
       ftp.close()
       ssh.close()
     except:
@@ -261,11 +267,11 @@ class EDGE:
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-class EdgeSimple(): 
+class EdgeSimple():
   sqrt2pi = (2.*ROOT.TMath.Pi())**0.5
-  """ 
+  """
   Edge Simple has 7 parameters:
-  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt | 
+  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt |
   """
   def __call__(self, x, p):
     X  = x[0]-p[1]
@@ -282,10 +288,10 @@ class EdgeSimple():
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-class EdgeComple(): 
-  """ 
+class EdgeComple():
+  """
   Edge Complex has 9 parameters:
-  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt | Sigma_R | Sigma_L 
+  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt | Sigma_R | Sigma_L
   F1, F2, F3 have 3 parameters:  Sigma_R | Sigma_L | Sigma_S |
   """
   infty = 20
@@ -294,21 +300,21 @@ class EdgeComple():
   T += '[1]*exp(-x**2/%s) * TMath::Erfc( x*[1]/([2]*sqrt%s)) / sqrt%s'    % (D2,D2,D2)
   T  = '(' + T + ') / (sqrt(pi)*([0]+[1])) '
   F1 = ROOT.TF1('F1',          T,  0.0, 1.0)
-  F2 = ROOT.TF1('F2', 'x*'   + T , 0.0, 1.0)  
-  F3 = ROOT.TF1('F3', 'x*x*' + T , 0.0, 1.0)  
+  F2 = ROOT.TF1('F2', 'x*'   + T , 0.0, 1.0)
+  F3 = ROOT.TF1('F3', 'x*x*' + T , 0.0, 1.0)
   parset = []
-    
+
   def __call__(self, x, p):
-    self.curpar  =        p[7], p[8], p[2] 
+    self.curpar  =        p[7], p[8], p[2]
     self.F1.SetParameters(p[7], p[8], p[2])
-    self.F2.SetParameters(p[7], p[8], p[2]) 
+    self.F2.SetParameters(p[7], p[8], p[2])
     self.F3.SetParameters(p[7], p[8], p[2])
     X = x[0]-p[1]
-    if self.parset == self.curpar: 
+    if self.parset == self.curpar:
       self.I1 += self.F1.Integral(X, self.Xo)
       self.I2 += self.F2.Integral(X, self.Xo)
       self.I3 += self.F3.Integral(X, self.Xo)
-    else: 
+    else:
       self.parset  = self.curpar
       self.I1  = self.F1.Integral(X, self.infty * p[2])
       self.I2  = self.F2.Integral(X, self.infty * p[2])
@@ -328,13 +334,13 @@ class BEMS_DB:
     T = { k:[] for k in self.NAMEs.keys()}
     for el in filechain:
       fn = el.split('.')[0].replace('SPECTRA','LOADS') + '.sta'
-      try:   
+      try:
         with open(fn,'rb') as fp: data = cPickle.load(fp)
-      except: 
-        print 'sta read error'; return 
+      except:
+        print 'sta read error'; return
       OK, LREC = (len(data.keys())==8), len(data['t'])
       if not OK: print 'Bad file: %s' % fn; return False
-      else: 
+      else:
         for k in data.keys():
           L = len(data[k])
           if L < LREC:

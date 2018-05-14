@@ -3,10 +3,10 @@ import ROOT, numpy, cPickle, os, time, ConfigParser
 from multiprocessing import Process, Queue
 from scale.isotopes  import Isotopes
 sql = True
-try: 
+try:
   from temdbWO import Storage
 except ImportError:
-  sql = False 
+  sql = False
   print 'database is unavailable'
 
 class Constants:
@@ -35,39 +35,38 @@ class EDGE(Constants):
     lwave        = cfg.getfloat('edge', 'WaveLength')       # laser wavelength [m]
     Constants.wo = Constants.h*Constants.c/lwave            # laser photon energy [eV]
     Constants.Eo = 0.25e-6 * Constants.me**2 / Constants.wo # (me^2/4wo) [MeV]
-    for i in range(10):
-      b, e = 'ex_from_%1d' % (i), 'ex_upto_%1d' % (i)
-      if cfg.has_option('edge', b) and cfg.has_option('edge', e):
-        self.exclude.append([ cfg.getfloat('edge', b), cfg.getfloat('edge', e) ])
-      else: break
-      
+#    for i in range(10):
+#      b, e = 'ex_from_%1d' % (i), 'ex_upto_%1d' % (i)
+#      if cfg.has_option('edge', b) and cfg.has_option('edge', e):
+#        self.exclude.append([ cfg.getfloat('edge', b), cfg.getfloat('edge', e) ])
+#      else: break
+
     self.cc      = ROOT.TCanvas('cc','BEMS for VEPP-2000', 800, 600, 800, 600)
     self.const   = ROOT.TF1('const', '[0]')
     self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7 ); self.simple.SetLineColor(ROOT.kRed)
     self.spreso  = ROOT.TF1('spreso', HPGeSpread(), 0, 1, 3 );
-    
-    self.convol = ROOT.TF1Convolution('simple', 'spreso');     self.convol.SetNofPointsFFT(1000)
-    self.comple = ROOT.TF1('comple', self.convol, 1.0, 2.0, 10);   self.comple.SetNpx(1000)
- 
-    self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC'); 
+
+    self.convol = ROOT.TF1Convolution('simple', 'spreso'); self.convol.SetNofPointsFFT(1000)
+    self.comple = ROOT.TF1('comple', self.convol, 1.0, 2.0, 10);    self.comple.SetNpx(1000)
+
+    self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC');
     self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
     self.plots   = EMSResults(cfg_file)
-    
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def __del__(self):
-    self.cc.cd(); self.cc.Clear() 
+    self.cc.cd(); self.cc.Clear()
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Go(self, UTB, UTE, hps, filechain):
-    self.hps = hps.Clone(); nbins = hps.GetNbinsX(); self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
     self.VEPP2K = VEPP2K_DB().GetRunInfo(filechain)
     if self.VEPP2K:
       print "V2K set beam energy: %7.2f MeV " % self.VEPP2K['E']
       if abs(self.ETuner)<10.0:           self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
       else:                               self.Eo = self.ETuner                           # [MeV]
-      if self.Radius:                     self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T] 
-      elif not self.VEPP2K.has_key('B'):  self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T] 
-      elif self.VEPP2K['B']<0.1:          self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T] 
+      if self.Radius:                     self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T]
+      elif not self.VEPP2K.has_key('B'):  self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T]
+      elif self.VEPP2K['B']<0.1:          self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T]
       elif abs(self.BTuner)<0.1:          self.Bo = self.VEPP2K['B'] + self.BTuner        # [T]
       else:                               self.Bo = self.BTuner                           # [T]
     else: self.Eo = 0.0
@@ -75,33 +74,33 @@ class EDGE(Constants):
     Wmax = 1.e+3*self.Eo*k/(1.+k)                                               # [keV]
     print "Fit initial beam energy: %7.2f MeV " % self.Eo
     zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
-    if gain:  
-      self.hps.SetBins(nbins, zero, zero + gain * nbins); self.hps.Rebin(self.Merger)
+    if gain:
+      nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
+      self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
+      # get rid of spikes:
+      for spike in self.EP:
+        lo = 1 + int((spike - zero - 3 * self.RR)/(gain*float(self.Merger)))
+        hi = 1 + int((spike - zero + 3 * self.RL)/(gain*float(self.Merger)))
+        for ch in range(lo, hi): self.hps.SetBinContent(ch, 0.0); self.hps.SetBinError(ch, 0.0)
+      Wmax = self.fitEdgeSimple(Wmax, self.Ranger)
       if Wmax:
-        for spike in self.exclude:
-          lo = 1 + int((spike[0]-zero)/(gain*float(self.Merger)))
-          hi = 1 + int((spike[1]-zero)/(gain*float(self.Merger)))
-          for ch in range(lo, hi): 
-            self.hps.SetBinContent(ch, 0.0); self.hps.SetBinError(ch, 0.0)
-        Wmax = self.fitEdgeSimple(Wmax, self.Ranger)
-        if Wmax:
-          Results = self.fitEdgeComple(Wmax, self.Ranger)
-          if Results:
-            self.plots.AddPoint(         UTB, UTE, Results)
-            if self.SaveDB: Save_for_SND(UTB, UTE, Results)
+        Results = self.fitEdgeComple(Wmax, self.Ranger)
+        if Results:
+          self.plots.AddPoint(         UTB, UTE, Results)
+          if self.SaveDB: Save_for_SND(UTB, UTE, Results)
       else:
         print 'No Edge?'
         self.cc.cd();      self.cc.Clear();    self.cc.SetGrid()
         self.hps.Draw(''); self.cc.Modified(); self.cc.Update()
-        
+
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeSimple(self,W,LBK):
-    
+
     K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
     self.const.SetRange(1.02*W, E2); self.hps.Fit('const','QRN');  B = self.const.GetParameter(0)
     self.const.SetRange(E1, 0.98*W); self.hps.Fit('const','QRN');  A = self.const.GetParameter(0) - B
-    # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |  
+    # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |
     params = numpy.fromiter([self.Eo,  self.Bo, A, 0.0, 0.0, B, 0.0], numpy.float)
     self.simple.SetParameters(params); self.simple.SetRange(E1, E2); self.simple.SetNpx(1000)
 
@@ -112,7 +111,7 @@ class EDGE(Constants):
     if not R.Status():
       E = fitParameters(self.simple)
 #      tilt = (1e+3*E['p'][3], 1e+3*E['e'][3], 1e+6*E['p'][4], 1e+6*E['e'][4])
-      print ' ╔ Simple Edge Fit: ═════════════╤══════════════════════╤═════════════════════════╗' 
+      print ' ╔ Simple Edge Fit: ═════════════╤══════════════════════╤═════════════════════════╗'
       print ' ║ Range from %5.0f to %5.0f keV │ E_beam = %7.2f MeV │   W_max = %9.3f keV ║' % (E1, E2, self.Eo, W)
       print ' ╟───────────────────────────────┴────────┬─────────────┴─────────────────────────╢'
       print ' ║ Beam energy: %8.3f ± %5.3f [MeV]    │ Bending field: %6.4f ± %6.4f [T]    ║' % (E['p'][0], E['e'][0], E['p'][1], E['e'][1])
@@ -121,16 +120,16 @@ class EDGE(Constants):
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
       print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
-      OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5) 
-      self.Legend.Clear(); 
+      OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5)
+      self.Legend.Clear();
       self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
-    else: OK = False  
-    
+    else: OK = False
+
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
     self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-50, E2+50)
     self.cc.Modified(); self.cc.Update()
 
-    if OK: 
+    if OK:
       k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
     else:
@@ -150,9 +149,9 @@ class EDGE(Constants):
       comple.ReleaseParameter(7);       comple.ReleaseParameter(8)
       q.put([R.Status(), R.Chi2(), R.Ndf(), R.Prob(), fitParameters(comple)])
 
-  
+
     self.convol.SetRange(E1, E2);            self.comple.SetRange(E1*1.005, E2*0.995)
-    self.simple.SetLineColor(ROOT.kBlue);    self.comple.SetLineColor(ROOT.kRed); 
+    self.simple.SetLineColor(ROOT.kBlue);    self.comple.SetLineColor(ROOT.kRed);
     P = fitParameters(self.simple)['p'];  P[2] *= 0.5;  P[5] *= 0.5;  P.extend([self.RR, self.RL, 1.0])
     self.comple.SetParameters(numpy.fromiter(P, numpy.float))
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
@@ -169,10 +168,10 @@ class EDGE(Constants):
       k        =  4e+6*pV[0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       deriv    = (1.+k)**2/k/(2.+k) # dE/dWmax, apply scale correcion to the beam energy:
       BE, dBE  = pV[0]-1e-3*self.SC*deriv,  (pE[0]**2 + (1e-3*deriv*self.dSC)**2)**0.5 # Beam Energy [MeV]
-      BF, dBF  = pV[1], pE[1]                                                          # Bending Field [T]  
+      BF, dBF  = pV[1], pE[1]                                                          # Bending Field [T]
       BS, dBS  = pV[9]*deriv,  pE[9]*deriv                                             # Beam Spread [MeV]
-      BR       = 1.e+8*pV[0]/Constants.c/BF;   dBR = BR * ((dBE/BE)**2 + (dBF/BF)**2)**0.5 # Beam Radius [cm] 
-      print ' ╔ Convolution Fit: ═════════════╤══════════════════════╤═════════════════════════╗' 
+      BR       = 1.e+8*pV[0]/Constants.c/BF;   dBR = BR * ((dBE/BE)**2 + (dBF/BF)**2)**0.5 # Beam Radius [cm]
+      print ' ╔ Convolution Fit: ═════════════╤══════════════════════╤═════════════════════════╗'
       print ' ║ Range from %5.0f to %5.0f keV │ σR = %4.2f ± %4.2f keV │ σL = %5.2f ± %5.2f keV  ║' % (E1, E2, self.RR, self.dRR, self.RL, self.dRL)
       print ' ╟───────────────────────────────┴────────┬─────────────┴─────────────────────────╢'
       print ' ║ Beam energy: %8.3f ± %5.3f [MeV]    │ Bending field: %6.4f ± %6.4f [T]    ║' % (BE, dBE, BF, dBF)
@@ -189,7 +188,7 @@ class EDGE(Constants):
       self.Legend.Draw('SAME')
     else: OK = False
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
-    
+
     if OK: return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS]}
     else:  print 'Complex fit: bad fit, bad amplitude, spread or χ2';  return False
 
@@ -198,9 +197,9 @@ class EDGE(Constants):
   def GetCalibrationResults(self, t, wmax):
     for attempt in xrange(3):
       Scale = self.HPGe.Get_Calibration(t, wmax)
-      L = len(Scale['R']) 
+      L = len(Scale['R'])
       if L: break
-      else: print 'Waiting 20s for calibration results...';   time.sleep(20) 
+      else: print 'Waiting 20s for calibration results...';   time.sleep(20)
     if L == 1: c = 0
     elif L >1:
       Q = [Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c] for c in range(L)]
@@ -217,7 +216,7 @@ class EDGE(Constants):
     print ' ╔ HPGe calibration: %15s ══════════════════╤══════════════════════════╗' % (self.HPGe.outfile)
     print ' ║  W_max  = %9.3f keV  │ σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV  ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
     print ' ╚══════════════════════════╧══════════════════════════╧══════════════════════════╝\n'
-    return zero, gain  
+    return zero, gain
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -227,14 +226,14 @@ class VEPP2K_DB:
     R, T = {'E':0, 'dE':0.0, 'I':0.0, 'dI':0.0}, { k:[] for k in self.NAMEs.keys()}
     for el in filechain:
       fn = el.split('.')[0].replace('SPECTRA','LOADS') + '.sta'
-      try:   
+      try:
         with open(fn,'rb') as fp: data = cPickle.load(fp)
-      except: 
+      except:
         print 'sta read error'; return R
-      
+
       OK, LREC = (len(data.keys())==10), len(data['t'])
       if not OK: print 'Bad file: %s' % fn; return R
-      else: 
+      else:
         for k in data.keys():
           L = len(data[k])
           if L < LREC:
@@ -244,20 +243,20 @@ class VEPP2K_DB:
             print 'Error: LREC_t = %d, while LREC_%s = %d' % (LREC,k,L)
             return R
       for k,v in self.NAMEs.iteritems(): T[k].extend(data[v])
-        
+
     A = numpy.fromiter(T['Ee'], numpy.float);  R['E'], R['dE']  = A.mean(), A.std()
     A = numpy.fromiter(T['Ie'], numpy.float);  R['I'], R['dI']  = A.mean(), A.std()
     A = numpy.fromiter(T['Bo'], numpy.float);  R['B'], R['dB']  = A.mean(), A.std()
-    print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗' 
+    print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗'
     print ' ║  E = %7.2f ± %5.2f MeV │ Ie = %5.1f ± %5.1f mA   │  Bo = %7.5f ± %7.5f T ║' % (R['E'], R['dE'], R['I'], R['dI'], R['B'], R['dB'])
     print ' ╚══════════════════════════╧═════════════════════════╧═══════════════════════════╝\n'
-    if R['I'] < 5.0 : return False 
+    if R['I'] < 5.0 : return False
     return R
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class EdgeSimple(Constants): # Ai integral (classical formula) and Klein-Nishina cross section
-  ROOT.airy_ai_int(numpy.array([0.0]), numpy.array([0.0])) # first call => initialization (could be up to 5 sec) 
-  iAiry = ROOT.TF1("af", ROOT.airy_ai_int, -55, 5, 1) 
+  ROOT.airy_ai_int(numpy.array([0.0]), numpy.array([0.0])) # first call => initialization (could be up to 5 sec)
+  iAiry = ROOT.TF1("af", ROOT.airy_ai_int, -55, 5, 1)
   # p[0] - Beam Energy    [MeV] | p[1] - Bending field  [T]   | p[2] - Amplitude
   # p[3] - Linear Slope at Wmax | p[4] - Square Slope at Wmax | p[5] and p[6] - Background and its Slope
   def __call__(self, x, p):
@@ -270,7 +269,7 @@ class EdgeSimple(Constants): # Ai integral (classical formula) and Klein-Nishina
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with normal Gaussian from beam spread
-# p[0] - HPGe sigma_R [keV] | p[1] - HPGe sigma_L [keV]  | p[2] Beam spread smearing [keV] 
+# p[0] - HPGe sigma_R [keV] | p[1] - HPGe sigma_L [keV]  | p[2] Beam spread smearing [keV]
   C = 1./ROOT.TMath.Sqrt(2*ROOT.TMath.Pi())
   def __call__(self, x, p):
     R, L = p[0]*p[0] + p[1]*p[1], p[0]*p[0]+ p[2]*p[2]
@@ -288,7 +287,7 @@ class EMSResults:
     cfg = ConfigParser.ConfigParser()
     cfg.read(cfg_file)
     self.roofile = cfg.get('scan', 'file')
- 
+
   def __del__(self):
     if hasattr(self, 'rc'): self.rc.cd(); self.rc.Clear()
 
@@ -313,11 +312,11 @@ class EMSResults:
   def AddPoint(self, UTB, UTE, R):
     n, m, k = self.ReadGraphs()
     x, dx = 0.5*(UTB + UTE), 0.5*(UTE - UTB)
-    y, dy = R['BE']; self.BE.SetPoint(n, x, y); self.BE.SetPointError(n, dx, dy)    
-    y, dy = R['BF']; self.BF.SetPoint(m, x, y); self.BF.SetPointError(m, dx, dy)    
-    y, dy = R['BS']; self.BS.SetPoint(k, x, y); self.BS.SetPointError(k, dx, dy)    
+    y, dy = R['BE']; self.BE.SetPoint(n, x, y); self.BE.SetPointError(n, dx, dy)
+    y, dy = R['BF']; self.BF.SetPoint(m, x, y); self.BF.SetPointError(m, dx, dy)
+    y, dy = R['BS']; self.BS.SetPoint(k, x, y); self.BS.SetPointError(k, dx, dy)
     self.SaveGraphs()
-    
+
   def ShowRunInfo(self):
     n, m, k = self.ReadGraphs()
     for g in [self.BE, self.BF, self.BS]:
@@ -326,11 +325,11 @@ class EMSResults:
       g.SetMarkerColor(ROOT.kRed); g.SetMarkerStyle(20); g.GetYaxis().SetDecimals()
     self.rc = ROOT.TCanvas('rc','BEMS results for VEPP-2000', 5, 5, 1000, 1200)
     self.rc.Divide(1,3)
-    self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Fit('pol0'); self.BE.Draw('AP'); 
+    self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Fit('pol0'); self.BE.Draw('AP');
     self.BE.GetXaxis().SetTitle('time');         self.BE.GetYaxis().SetTitle('Beam energy [MeV]')
-    self.rc.cd(2); self.rc.GetPad(2).SetGrid();  self.BF.Fit('pol0'); self.BF.Draw('AP'); 
+    self.rc.cd(2); self.rc.GetPad(2).SetGrid();  self.BF.Fit('pol0'); self.BF.Draw('AP');
     self.BF.GetXaxis().SetTitle('time');         self.BF.GetYaxis().SetTitle('Bending field [T]')
-    self.rc.cd(3); self.rc.GetPad(3).SetGrid();  self.BS.Fit('pol0'); self.BS.Draw('AP'); 
+    self.rc.cd(3); self.rc.GetPad(3).SetGrid();  self.BS.Fit('pol0'); self.BS.Draw('AP');
     self.BS.GetXaxis().SetTitle('time');         self.BS.GetYaxis().SetTitle('Beam energy spread [keV]')
     self.rc.Modified()
     self.rc.Update()
@@ -343,14 +342,14 @@ def Save_for_SND(UTB, UTE, R):
   PL = {'/EMS/DT':dt, '/EMS/E':E, '/EMS/DE':dE, '/EMS/B':B, '/EMS/DB':dB, '/EMS/S':S, '/EMS/DS':dS}
   print 'WRITING TO SND ',
   DB = Storage()
-  for k,v in PL.iteritems(): 
-    DB.register(k); DB[k]=v; print '.', 
+  for k,v in PL.iteritems():
+    DB.register(k); DB[k]=v; print '.',
   try:
     DB.insert(t)
   except:
     try:
       DB.replace(t)
-    except: 
+    except:
       print 'Warning! Can not write nor replace data!'
       return
   print ' DONE'
@@ -359,7 +358,7 @@ def Save_for_SND(UTB, UTE, R):
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 def fitParameters(fitf):
   n, p, e = fitf.GetNumberFreeParameters(), [], []
-  for i in range(n):  
+  for i in range(n):
     p.append(fitf.GetParameter(i))
     e.append(fitf.GetParError(i))
   return {'p':p,'e':e}

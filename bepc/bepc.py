@@ -69,7 +69,7 @@ class EDGE:
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeSimple(self,W,LBK):
-    K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin; self.simple.SetRange(E1, E2)
+    K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin; self.simple.SetRange(E1, E2)
     self.const.SetRange(1.02*W, E2); self.hps.Fit('const','QRN');  B = self.const.GetParameter(0)
     self.const.SetRange(E1, 0.98*W); self.hps.Fit('const','QRN');  A = self.const.GetParameter(0) - B
     # Amplitude | Position | Sigma | edge tilt ~x | edge tilt ~x^2 | Background | Background Slope
@@ -79,7 +79,7 @@ class EDGE:
     self.simple.SetParLimits(2, 1.0, 1.0e+2)
     R = self.hps.Fit('simple','RSQN'); OK = False
     if not R.Status():
-      W = self.simple.GetParameter(1);   E1, E2 = W - LBK*Wmin, W + Wmin; self.simple.SetRange(E1,E2)
+      W = self.simple.GetParameter(1);   E1, E2 = W - LBK*Wmin, W + LBK*Wmin; self.simple.SetRange(E1,E2)
       R = self.hps.Fit('simple','RSQN')
       E = fitParameters(self.simple); Prob = R.Prob()
       print ' ╔ Simple Edge Fit: ═══════════╤══════════════════════╤═══════════════════════════╗'
@@ -108,7 +108,7 @@ class EDGE:
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComplex(self,E,LBK):
     W = E['p1']
-    K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + Wmin; self.comple.SetRange(E1, E2)
+    K = 2.*W/self.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin; self.comple.SetRange(E1, E2)
     S = E['p2']**2 - self.RR**2; S = 1.0 if S<0.0 else S**0.5 # estimated influence of beam energy spread to the edge width
 
     Ebeam = self.BEPC[self.lepton]['E'] # MeV

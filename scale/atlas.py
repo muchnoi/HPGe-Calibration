@@ -12,7 +12,7 @@ class Atlas:
 #    self.atlas['Ale81']   =   [{'Key':'0', 'W':6129.240, 'dW':.050, 'CC':False,  'RC':False}]
 #    self.atlas['She82']   =   [{'Key':'0', 'W':6129.142, 'dW':.032, 'CC':False,  'RC':False}]
 #    self.atlas['Ken86']   =   [{'Key':'0', 'W':6129.119, 'dW':.040, 'CC':False,  'RC':False}]
-    
+
 # According to Gamma-ray energy Standards
 #    self.atlas['Cs137']   =   [{'Key':'0', 'W': 661.657, 'dW':.003, 'CC':True,   'RC':True}]
 #    self.atlas['Co60 ']   =   [{'Key':'0', 'W':1173.228, 'dW':.003, 'CC':True,   'RC':True}]
@@ -43,13 +43,13 @@ class Atlas:
 #    self.atlas['Pb212'].append({'Key':'0', 'W': 238.632, 'dW':.200, 'I':43.3, 'dI':0.4, 'CC':False, 'RC':False})
 #    self.atlas['Pb212'].append({'Key':'1', 'W': 300.087, 'dW':.010, 'I':3.28, 'dI':0.3, 'CC':True, 'RC':True})
 
-#    self.atlas['In116'] = []
- 
+    self.atlas['In116'] = []
+
 #    self.atlas['In116'].append({'Key':'0', 'W': 416.860, 'dW':.030, 'I':27.7, 'dI':12, 'CC':False, 'RC':False})
 #    self.atlas['In116'].append({'Key':'1', 'W': 818.718, 'dW':.021, 'I':11.5, 'dI':4 , 'CC':False, 'RC':False})
 #    self.atlas['In116'].append({'Key':'2', 'W':1097.326, 'dW':.022, 'I':56.2, 'dI':11, 'CC':False, 'RC':False})
 #    self.atlas['In116'].append({'Key':'3', 'W':1293.558, 'dW':.015, 'I':84.4, 'dI':17, 'CC':False, 'RC':False})
-#    self.atlas['In116'].append({'Key':'4', 'W':1507.670, 'dW':.040, 'I':10.0, 'dI':3 , 'CC':False, 'RC':False})	
+#    self.atlas['In116'].append({'Key':'4', 'W':1507.670, 'dW':.040, 'I':10.0, 'dI':3 , 'CC':False, 'RC':False})
 #    self.atlas['In116'].append({'Key':'5', 'W':2112.312, 'dW':.022, 'I':15.5, 'dI':4 , 'CC':False, 'RC':False})
 
 #    self.atlas['FePNG'] = []
@@ -68,7 +68,7 @@ class Atlas:
 #    self.atlas['FePNG'].append({'Key':'12', 'W':7645.480 , 'dW':.090, 'I':.549, 'dI':.001, 'CC':True,  'RC':True})
 
 
-    
+
 # The following were measured by using the previous to calibrate HPGe
 #    self.atlas['Ac228']   =   [{'Key':'0', 'W': 911.282, 'dW':.004, 'CC':False,  'RC':False, 'Compton':.0099 }]
 #    self.atlas['Ac228'].append({'Key':'1', 'W': 964.799, 'dW':.010, 'CC':False,  'RC':True })
@@ -140,12 +140,12 @@ class Atlas:
 
 #        for next in lines[n:]: # Possible summs of two gammas
 #          if line['W']+next['W'] > 2615.0:
-#            T.append({'Key':line['Key']+'+'+next['Key'], 'W': line['W']+next['W'], 
+#            T.append({'Key':line['Key']+'+'+next['Key'], 'W': line['W']+next['W'],
 #                     'dW':sqError([line['dW'],next['dW']]), 'CC':False,  'RC':False})
-  
-  
+
+
   def __del__(self):
     del self.atlas
 
 
-	
+

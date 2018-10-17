@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import ROOT, time, sys, ConfigParser
+import ROOT, time, os, sys, ConfigParser
 import numpy as np
 from atlas import Atlas
 from scipy.interpolate import UnivariateSpline
@@ -58,9 +58,9 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     # Energy Resolution Section
     self.ERG      = ROOT.TMultiGraph(); self.ERG.SetTitle('#sigma_{E} / E [%]')
     self.eres_C   = ROOT.TF1('eres_C', ResolutionModel(), -self.emax, self.emax, 4) # combined resolution model [%]
-    self.eres_C.SetParameters(1.0,  0.24, 0.000, 100.0); self.eres_C.SetLineColor(self.Colors[0])
+    self.eres_C.SetParameters(1.0,  0.24, 0.1e-6, 100.0); self.eres_C.SetLineColor(self.Colors[0])
     self.eres_C.SetParLimits( 0,    0.40, 10.00);        self.eres_C.SetParLimits(1, 0.05, 0.500)
-    self.eres_C.SetParLimits( 2,    0.00, 0.001);        self.eres_C.SetParLimits(3, -5000.00, 5000.)
+    self.eres_C.SetParLimits( 2,    0.005e-6, 0.15e-6)
     self.pulser   = ROOT.TF1('pulser', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
     self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[2])
     self.InitGraphics()
@@ -315,7 +315,14 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.RO.SetPoint(N-n-1, -p['E'], 100*p[K]['p3']/p['E']); self.RO.SetPointError(N-n-1, p['dE'], 100*p[K]['dp3']/p['E'])
       self.RO.SetPoint(N+n,    p['E'], 100*p[K]['p2']/p['E']); self.RO.SetPointError(N+n,   p['dE'], 100*p[K]['dp2']/p['E'])
 
-    R = self.RC.Fit('eres_C','RSQN')
+    if self.rep3: self.eres_C.FixParameter(3, self.rep3)
+    else:         self.eres_C.SetParLimits(3, -500.00, 500.)
+#    self.eres_C.FixParameter(2, 0.01e-6)
+#    self.eres_C.FixParameter(3, 0.0)
+    R = self.RC.Fit('eres_C','RSQN');
+#    self.eres_C.ReleaseParameter(2)
+#    self.eres_C.ReleaseParameter(3)
+    if self.rep3: self.eres_C.ReleaseParameter(3)
     P = fitParameters(self.eres_C); quality = '#chi^{2}/NDF = %5.1f/%3d' % (P['Chi2'], P['NDF'])
     PP1 = (P['p0'], P['dp0'], 1e+6*P['p2'], 1e+6*P['dp2'], P['Chi2'], P['NDF'])
     PP2 = (P['p1'], P['dp1'],      P['p3'],      P['dp3'], R.Prob())
@@ -323,6 +330,10 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     print ' ║ Noise: %5.3f ± %5.3f keV │ Trapping:  %5.3f ± %5.3f ppm │ χ2/NDF:   %5.1f/%3d  ║' % PP1
     print ' ║ Fano fact: %5.3f ± %5.3f │ Threshold: %5.0f ± %5.0f keV │ Probability:  %5.3f  ║' % PP2
     print ' ╚══════════════════════════╧══════════════════════════════╧══════════════════════╝\n'
+
+#    with open('p3_vs_p2.txt', 'a') as fp:
+#      fp.write('%5.3f  %5.3f  %5.0f  %5.0f\n' % (1e+6*P['p2'], 1e+6*P['dp2'], P['p3'], P['dp3']))
+
     return quality
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -388,6 +399,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.fitL = cfg.getfloat(S, 'fitL');    self.fitR = cfg.getfloat(S, 'fitR')
       self.erec = cfg.getfloat(S, 'erec');    self.tbpa = cfg.getfloat(S, 'tbpa')
       self.nitr = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
+      if cfg.has_option(S, 'thre'):           self.rep3 = cfg.getfloat(S, 'thre')
+      else:                                   self.rep3 = 0.0
       if cfg.has_option(S, 'name0'): self.names[0] = '%11s' % cfg.get(S, 'name0')
       if cfg.has_option(S, 'name1'): self.names[1] = '%11s' % cfg.get(S, 'name1')
       if cfg.has_option(S, 'name2'): self.names[2] = '%11s' % cfg.get(S, 'name2')
@@ -437,6 +450,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
   def Get_Calibration(self, t = 0, w = 1000.0, pause = False):
     x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
     OD = {'T':[], 'dT':[], 'Z':[], 'G':[], 'N':[], 'dW':[], 'C':[], 'dC':[], 'R':[], 'dR':[], 'L':[], 'dL':[], 'X':[]}
+    if not os.path.isfile(self.outfile):  print 'calibration results do not exist!';  exit()
     f, CARE  = ROOT.TFile(self.outfile), ROOT.TList()
 #    print 'Get calibration from: ', self.outfile
     for el in [el.GetName() for el in f.GetListOfKeys()]:
@@ -483,7 +497,6 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         else:
           self.PB5, c, dc = False, 0.0, 0.0
 
-
         self.Show_Energy_Scale()
 
         # 3. Resolution
@@ -498,25 +511,26 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         R = self.RC.Fit('eres_C','QRNS')
 
         quality = '#chi^{2}/NDF = %5.1f/%3d' % (self.eres_C.GetChisquare(),  self.eres_C.GetNDF())
-        R.GetConfidenceIntervals(2, 1, 1, x, er, 0.683, True)
-        r = self.eres_C.Eval(x[0]); dr = er[0]#;   print r, '±', dr
-        l = self.eres_C.Eval(x[1]); dl = er[1]#;   print l, '±', dl
         self.Show_Energy_Resolution(quality)
-        """
-        https://root.cern.ch/root/html/ROOT__Fit__FitResult.html
-        GetConfidenceIntervals(unsigned int n, unsigned int stride1, unsigned int stride2, const double* x, double* ci, double cl, bool norm = true)
-        get confidence intervals for an array of n points x.
-        stride1 indicates the stride in the coordinate space while stride2 the stride in dimension space.
-        For 1-dim points : stride1=1, stride2=1
-        for multi-dim points arranged as (x0,x1,...,xN,y0,....yN)          stride1=1      stride2=n
-        for multi-dim points arraged  as (x0,y0,..,x1,y1,...,xN,yN,..)     stride1=ndim,  stride2=1
-        the confidence interval are returned in the array ci
-        cl is the desired confidedence interval value
-        norm is a flag to control if the intervals need to be normalized to the chi2/ndf value
-        By default the intervals are corrected using the chi2/ndf value of the fit if a chi2 fit is performed
-        """
-#        time.sleep(0.5)
+
         if not R.Status(): # i. e. all the fits are O.K.
+          R.GetConfidenceIntervals(2, 1, 1, x, er, 0.683, True)
+          r = self.eres_C.Eval(x[0]); dr = er[0]#;   print r, '±', dr
+          l = self.eres_C.Eval(x[1]); dl = er[1]#;   print l, '±', dl
+          """
+          https://root.cern.ch/root/html/ROOT__Fit__FitResult.html
+          GetConfidenceIntervals(unsigned int n, unsigned int stride1, unsigned int stride2, const double* x, double* ci, double cl, bool norm = true)
+          get confidence intervals for an array of n points x.
+          stride1 indicates the stride in the coordinate space while stride2 the stride in dimension space.
+          For 1-dim points : stride1=1, stride2=1
+          for multi-dim points arranged as (x0,x1,...,xN,y0,....yN)          stride1=1      stride2=n
+          for multi-dim points arraged  as (x0,y0,..,x1,y1,...,xN,yN,..)     stride1=ndim,  stride2=1
+          the confidence interval are returned in the array ci
+          cl is the desired confidedence interval value
+          norm is a flag to control if the intervals need to be normalized to the chi2/ndf value
+          By default the intervals are corrected using the chi2/ndf value of the fit if a chi2 fit is performed
+          """
+#         time.sleep(0.5)
           OD['T'].append(0.5*(utb+ute));  OD['dT'].append(0.5*(ute-utb))
           OD['Z'].append(zero);           OD['G' ].append(gain)
           OD['N'].append(ptype);          OD['dW'].append(dw)
@@ -539,20 +553,22 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     W = asarray(W)
     e1 = ROOT.TGraphErrors(NE, E['T'], W,      E['dT'], E['dW']); e1.SetTitle('CH. %d absolute energy equivalent'           % mchan )
     e2 = ROOT.TGraphErrors(NE, E['T'], E['C'], E['dT'], E['dC']); e2.SetTitle('pulser correction for %5.0f keV #gamma-rays' % energy)
-    e3 = ROOT.TGraphErrors(NE, E['T'], E['R'], E['dT'], E['dR']); e3.SetTitle('#sigma_{RIGHT} for %5.0f keV #gamma-rays'    % energy)
-    e4 = ROOT.TGraphErrors(NE, E['T'], E['L'], E['dT'], E['dL']); e4.SetTitle('#sigma_{LEFT} for %5.0f keV #gamma-rays'     % energy)
-    lg = ROOT.TLegend(0.75, 0.75, 0.98, 0.95, '', 'brNDC');  lg.AddEntry(e1, self.outfile, 'lpe')
-    cs = ROOT.TCanvas('cs','scale & resolution', 2, 2, 1002, 1002); cs.Divide(2,2)
-    cs.cd(1); cs.GetPad(1).SetGrid(); e1.Draw('AP'); lg.Draw('SAME')
-    cs.cd(2); cs.GetPad(2).SetGrid(); e2.Draw('AP'); lg.Draw('SAME')
-    cs.cd(3); cs.GetPad(3).SetGrid(); e3.Draw('AP'); lg.Draw('SAME')
-    cs.cd(4); cs.GetPad(4).SetGrid(); e4.Draw('AP'); lg.Draw('SAME')
+    e3 = ROOT.TGraphErrors(NE, E['T'], E['L'], E['dT'], E['dL']); e3.SetTitle('#sigma_{LEFT} for %5.0f keV #gamma-rays'     % energy)
+    e4 = ROOT.TGraphErrors(NE, E['T'], E['R'], E['dT'], E['dR']); e4.SetTitle('#sigma_{RIGHT} for %5.0f keV #gamma-rays'    % energy)
+#    lg = ROOT.TLegend(0.75, 0.75, 0.98, 0.95, '', 'brNDC');  lg.AddEntry(e1, self.outfile, 'lpe')
+
+    cs = ROOT.TCanvas('cs','scale & resolution', 2, 2, 1202, 1002); cs.Divide(2,2)
+    cs.cd(1); cs.GetPad(1).SetGrid(); e1.Draw('AP')#; lg.Draw('SAME')
+    cs.cd(2); cs.GetPad(2).SetGrid(); e2.Draw('AP')#; lg.Draw('SAME')
+    cs.cd(3); cs.GetPad(3).SetGrid(); e3.Draw('AP')#; lg.Draw('SAME')
+    cs.cd(4); cs.GetPad(4).SetGrid(); e4.Draw('AP')#; lg.Draw('SAME')
     for g in [e1,e2,e3,e4]:
       g.SetMarkerStyle(20);           g.SetMarkerColor(ROOT.kRed);    g.SetLineColor(ROOT.kRed)
       g.GetXaxis().SetTimeDisplay(1); g.GetXaxis().SetTimeFormat(TF); g.GetXaxis().SetLabelOffset(0.03)
       g.GetYaxis().SetDecimals();     g.GetYaxis().SetTitle('keV');   g.GetYaxis().SetTitleOffset(1.2)
 
-    cs.Modified(); cs.Update()
+    cs.Modified(); cs.Update(); cs.SaveAs(self.outfile + '.pdf')
+
     print 'Average energy      = %8.3f ± %8.3f keV' % (e1.GetMean(2), e1.GetRMS(2))
     print 'Average correction  = %8.3f ± %8.3f keV' % (e2.GetMean(2), e2.GetRMS(2))
     print 'Average right sigma = %8.3f ± %8.3f keV' % (e3.GetMean(2), e3.GetRMS(2))

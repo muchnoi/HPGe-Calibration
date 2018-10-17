@@ -40,7 +40,7 @@ class Energy_Scan:
     Points_Names.append('%.3f MeV' % TABLE['E'][n])
     while n < ngood-1:
       Condition1 = abs(TABLE['E'][n] - TABLE['E'][n+1]) < (TABLE['dE'][n] + TABLE['dE'][n+1])
-      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 4000 # separate points with large time gaps
+      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 4000 # separate points with "large" time gaps
       if Condition1 and Condition2:
         Energy_Points[PointN].append(TABLE['file'][n+1])
       else:

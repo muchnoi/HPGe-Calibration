@@ -1,0 +1,149 @@
+# -*- coding: utf-8 -*-
+#import paramiko
+
+import ROOT, ConfigParser
+import numpy as np
+from vepp2k import VEPP2K_DB
+from hpge import DataFile, Histogram
+
+
+class Energy_Scan:
+
+  def Go(self, flist, todo):
+    T, Emin, Emax = DataFile(), 100.0, 1000.0
+    ngood, TABLE = 0, {'file':[], 't':[], 'dt':[], 'E':[], 'dE':[], 'I':[], 'dI':[], 'PB5':[]}
+    cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
+    if cfg.has_option('scan', 'efrom'):  Emin = cfg.getfloat('scan', 'efrom')
+    if cfg.has_option('scan', 'eupto'):  Emax = cfg.getfloat('scan', 'eupto')
+    for f in flist:
+      T.ReadData(f,16384,100)
+      t, dt, PB5 = 0.5*(T.utb + T.ute), 0.5*(T.ute - T.utb), T.PB5
+      R = VEPP2K_DB().GetRunInfo([f])
+      if T and R:
+        E, dE, I, dI = R['E'], R['dE'], R['I'], R['dI']
+
+        if dt>200 and dE<0.5 and I > 5.0 and (Emin < E < Emax):
+          ngood += 1
+          TABLE['file'].append(f)
+          TABLE['PB5'].append(PB5)
+          TABLE['t' ].append(  t); TABLE['dt'].append(dt)
+          TABLE['E' ].append(  E); TABLE['dE'].append(dE)
+          TABLE['I' ].append(  I); TABLE['dI'].append(dI)
+      else:
+        print "bad records in %s (acq. time is %d s)" % (f, 2*dt)
+
+    self.cfh = ROOT.TCanvas('cfh','Files history', 2, 2, 1002, 1002);  self.cfh.Divide(1, 2)
+    self.Show_Points(TABLE);   raw_input('All of the points...')
+
+    n, PointN = 0, 0
+    Points_Names, Energy_Points = [], [ [ TABLE['file'][n] ] ]
+    Points_Names.append('%.3f MeV' % TABLE['E'][n])
+    tt = 2*TABLE['dt'][n]
+    while n < ngood-1:
+      C0 = TABLE['PB5'][n] == TABLE['PB5'][n+1]
+      if not C0:
+        print 'PB-5 lines-set change:'
+        print TABLE['PB5'][n]
+        print TABLE['PB5'][n+1]
+        raw_input()
+      C1 = abs(TABLE['E'][n+1] - TABLE['E'][n]) < (TABLE['dE'][n] + TABLE['dE'][n+1])
+      C2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 4000  # separate points with "large" time gaps
+      C3 = tt < 1000                                    # each point should not be longer than
+      CC = C0 and C1 and C2 and C3
+      if CC:
+        tt += 2*TABLE['dt'][n+1]
+        Energy_Points[PointN].append(TABLE['file'][n+1])
+      else:
+        PointN += 1
+        tt  = 2*TABLE['dt'][n+1]
+        Energy_Points.append([TABLE['file'][n+1]])
+        Points_Names.append('%.3f MeV' % TABLE['E'][n+1])
+      n += 1
+
+    print 'Initially:'
+    for PointN in range(len(Energy_Points)):
+      print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
+
+# Clear TABLE
+    p, tnp = 0, len(Energy_Points)
+    while p < tnp:
+      Ne = len([fn for fn in Energy_Points[p]])
+      if len(Energy_Points[p]) < 3 or not Ne:
+        for el in Energy_Points[p]:
+          rem_rec = TABLE['file'].index(el)
+          for key in TABLE.keys(): TABLE[key].pop(rem_rec)
+        Energy_Points.pop(p);      Points_Names.pop(p)
+        tnp -= 1
+      else:
+        p += 1
+
+    self.Show_Points(TABLE)
+
+    print 'After selection:'
+    for PointN in range(len(Energy_Points)):
+      print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
+
+    raw_input( '%d energy scan points have been founded' % PointN )
+
+    H = Histogram(todo)
+    for PointN in range(len(Energy_Points)):
+      flist = Energy_Points[PointN]
+      H.nfile = len(flist)
+      print '\nPoint %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(flist))
+      if todo.edge:
+        R = H.Go(flist)
+        if R:
+          t, dt = R['T'][0], R['T'][1]
+          e, de = R['BE'][0], R['BE'][1]
+          s, ds = R['BS'][0], R['BS'][1]
+          b, db = R['BF'][0], R['BF'][1]
+          i, di = R['BC'][0], R['BC'][1]
+          if R:
+            fmt = '%10d  %5d  %8.3f  %5.3f  %6.3f  %5.3f  %7.5f  %7.5f  %6.3f  %5.3f # point %2d (%s)\n'
+            outs = fmt % (t, dt, e, de, s, ds, b, db, i, di, PointN, Points_Names[PointN])
+            with open('SCAN.results','a') as f: f.write(outs)
+#        raw_input('Point %d energy measurement is ready' % PointN)
+      else:
+        flist = [el for el in Energy_Points[PointN]];  H.nfile = len(flist);  H.Go(flist)
+        print 'Point %d scale calibration is ready (porridge)'  % PointN
+
+
+
+
+
+    raw_input('So what?')
+
+
+  def Show_Points(self,TABLE):
+    TE = {'t':[], 'dt':[], 'E':[], 'dE':[], 'I':[], 'dI':[]}
+    for n in range(len(TABLE['file'])):
+      for k in TE.keys(): TE[k].append(TABLE[k][n])
+
+    T, dT = np.fromiter(TE['t'], np.float), np.fromiter(TE['dt'], np.float)
+    E, dE = np.fromiter(TE['E'], np.float), np.fromiter(TE['dE'], np.float)
+    I, dI = np.fromiter(TE['I'], np.float), np.fromiter(TE['dI'], np.float)
+
+    GE = ROOT.TGraphErrors(len(T), T, E, dT, dE); GE.SetMarkerColor(ROOT.kBlue);  GE.SetLineColor(ROOT.kBlue); GE.SetMarkerStyle(20)
+    GE.GetXaxis().SetTimeDisplay(1);  GE.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
+    GE.GetXaxis().SetLabelSize(0.02); GE.GetXaxis().SetTitle('Novosibirsk time'); GE.GetXaxis().SetLabelOffset(0.02)
+    GE.SetTitle('Mean VEPP2K Energy [MeV]')
+    self.GE = GE
+
+    GI = ROOT.TGraphErrors(len(T), T, I, dT, dI); GI.SetMarkerColor(ROOT.kBlue);  GI.SetLineColor(ROOT.kBlue); GI.SetMarkerStyle(20)
+    GI.GetXaxis().SetTimeDisplay(1);  GI.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
+    GI.GetXaxis().SetLabelSize(0.02); GI.GetXaxis().SetTitle('Novosibirsk time'); GI.GetXaxis().SetLabelOffset(0.02)
+    GI.SetTitle('Mean VEPP2K Current [mA]')
+    self.GI = GI
+
+#    GS = ROOT.TGraph(len(T), T, dE);  GS.SetMarkerColor(ROOT.kBlue); GS.SetLineColor(ROOT.kBlue); GS.SetMarkerStyle(20)
+#    GS.GetXaxis().SetTimeDisplay(1);  GS.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
+#    GS.GetXaxis().SetLabelSize(0.02); GS.GetXaxis().SetTitle('China time'); GS.GetXaxis().SetLabelOffset(0.02)
+#    GS.SetTitle('R.m.s. VEPP2K Energy [MeV]')
+#    self.GS = GS
+
+    self.cfh.cd(1); self.cfh.GetPad(1).SetGrid(); self.GE.Draw('AP')
+    self.cfh.cd(2); self.cfh.GetPad(2).SetGrid(); self.GI.Draw('AP')
+#    self.cfh.cd(3); self.cfh.GetPad(3).SetGrid(); self.GS.Draw('AP')
+
+    self.cfh.Modified(); self.cfh.Update()
+

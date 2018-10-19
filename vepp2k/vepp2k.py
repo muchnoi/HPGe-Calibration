@@ -313,8 +313,8 @@ class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with 
   def __call__(self, x, p):
     SR = 0.5/(p[0]*p[0] + p[2]*p[2]); RR = ROOT.TMath.Sqrt(SR)
     SL = 0.5/(p[1]*p[1] + p[2]*p[2]); RL = ROOT.TMath.Sqrt(SL)
-    R = ROOT.TMath.Exp(-x[0]*x[0]*SR) * ROOT.TMath.Erfc(-x[0]*RR * p[0]/p[2]) * RL / (1. + p[1]/p[0])
-    L = ROOT.TMath.Exp(-x[0]*x[0]*SL) * ROOT.TMath.Erfc( x[0]*RL * p[1]/p[2]) * RR / (1. + p[0]/p[1])
+    R = ROOT.TMath.Exp(-x[0]*x[0]*SR) * ROOT.TMath.Erfc(-x[0] * RR * p[0]/p[2]) * RR / (1. + p[1]/p[0])
+    L = ROOT.TMath.Exp(-x[0]*x[0]*SL) * ROOT.TMath.Erfc( x[0] * RL * p[1]/p[2]) * RL / (1. + p[0]/p[1])
     return (L + R) / ROOT.TMath.Sqrt(ROOT.TMath.Pi())
 """
 # ЭТО НЕВЕСТЬ ОТКУДА ПОЛУЧЕННАЯ НЕПРАВИЛЬНАЯ СВЕРТКА!!!
@@ -385,8 +385,9 @@ class EMSResults:
     for g in [self.BE, self.BF, self.BS, self.BC]:
       g.GetXaxis().SetTimeDisplay(1); g.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
       g.GetXaxis().SetTitle('time');  g.GetXaxis().SetLabelOffset(0.02)
-      g.SetMarkerColor(ROOT.kRed); g.SetMarkerStyle(20); g.GetYaxis().SetDecimals()
-    self.rc = ROOT.TCanvas('rc','BEMS results for VEPP-2000', 5, 5, 1000, 1200)
+      g.SetMarkerColor(ROOT.kRed); g.SetLineColor(ROOT.kRed)
+      g.SetMarkerStyle(20); g.SetMarkerSize(1.25); g.GetYaxis().SetDecimals()
+    self.rc = ROOT.TCanvas('rc','BEMS results for VEPP-2000', 0, 0, 1600, 1200)
     self.rc.Divide(1,3)
 
     self.rc.cd(1); self.rc.GetPad(1).SetGrid();  self.BE.Fit('pol0'); self.BE.Draw('AP');

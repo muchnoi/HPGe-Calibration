@@ -22,7 +22,7 @@ if ('-h' in sys.argv) or ('--help' in sys.argv):
   Usage()
 else:
   import ROOT
-  ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
+#  ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
   ROOT.gROOT.SetStyle("Plain")
   ROOT.gROOT.ForceStyle()
   ROOT.gStyle.SetTitleBorderSize(0)
@@ -123,6 +123,16 @@ class MonteCarlo:
     # p[5] - Background        | p[6] - Background Slope  | p[7] - sigma_R [keV] | p[8] - sigma_L [keV]        | p[9] - Beam spread blur [keV]
 
     P = [self.ebeam, self.field, AMP, -0.001, 0.00001, 10.0, -0.005, 0.1, 0.1, self.smax]
+
+    """
+    self.spreso.SetParameters(0.1, 0.2, 0.2)
+    print 'I = ', self.spreso.Integral(-1,1)
+    self.spreso.SetRange(-1,1)
+    self.cv.cd();       self.cv.SetGrid()
+    self.spreso.Draw()
+    self.cv.Modified(); self.cv.Update()
+
+#    """
     self.simple.SetParameters(np.fromiter(P[0:7], np.float))
 
     self.spread.SetParameters(np.fromiter(P,      np.float))
@@ -135,6 +145,8 @@ class MonteCarlo:
     self.spread.Draw('SAME')
     self.comple.Draw('SAME')
     self.cv.Modified(); self.cv.Update()
+#    """
+
 
 
 

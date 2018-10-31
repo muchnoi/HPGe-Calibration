@@ -84,9 +84,7 @@ class EDGE(Constants):
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
       # get rid of spikes:
-      self.EP.append(727 );  self.EP.append(860 )
-      self.EP.append(1294);  self.EP.append(1460)
-      self.EP.append(2103);
+      self.EP.append(727 ); self.EP.append(860 ); self.EP.append(1294);  self.EP.append(1461); self.EP.append(2103)
       for spike in self.EP:
         lo = 1 + int((spike - zero - 4 * self.RL)/(gain*float(self.Merger)))
         hi = 1 + int((spike - zero + 5 * self.RR)/(gain*float(self.Merger)))
@@ -334,6 +332,7 @@ class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with 
 class EMSResults:
   # Beam Energy, Bending Field, Beam energy Spread, Beam Current
   BE, BF, BS, BC = ROOT.TGraphErrors(), ROOT.TGraphErrors(), ROOT.TGraphErrors(), ROOT.TGraphErrors()
+  SI = ROOT.TProfile('SI','spread vs current', 30, 0, 150, 'g')
   headline = ('t, s', 'dt, s', '  E, MeV', 'dE, MeV', 'S, keV',  'dS, keV', '  B, T', 'dB, T', 'I, mA', 'dI, mA')
   headline = '# %8s  %5s  %8s  %5s  %5s  %5s  %6s  %6s  %5s  %6s\n' % headline
   dataline = '%10d  %5d  %8.3f  %7.3f  %6d  %7d  %6.4f  %6.4f  %5.1f  %6.1f\n'
@@ -343,10 +342,13 @@ class EMSResults:
     cfg.read(cfg_file)
     self.roofile = folder + cfg.get('scan', 'file')
     self.datfile = folder + cfg.get('scan', 'file') +'.txt'
+    self.espread = folder + 'SvsI.pdf'
+    self.SI.SetTitle(folder)
     with open(self.datfile,'a') as f:  f.write(self.headline)
 
   def __del__(self):
     if hasattr(self, 'rc'): self.rc.cd(); self.rc.Clear()
+    if hasattr(self, 'ic'): self.ic.cd(); self.ic.Clear()
 
   def SaveGraphs(self):
     fp = ROOT.TFile(self.roofile, 'RECREATE')
@@ -375,7 +377,7 @@ class EMSResults:
     e, de = R['BE']; self.BE.SetPoint(n, t, e); self.BE.SetPointError(n, dt, de)
     b, db = R['BF']; self.BF.SetPoint(m, t, b); self.BF.SetPointError(m, dt, db)
     s, ds = R['BS']; self.BS.SetPoint(k, t, s); self.BS.SetPointError(k, dt, ds)
-    c, dc = R['BC']; self.BC.SetPoint(k, t, c); self.BC.SetPointError(k, dt, dc)
+    c, dc = R['BC']; self.BC.SetPoint(l, t, c); self.BC.SetPointError(l, dt, dc)
     self.SaveGraphs()
     with open(self.datfile,'a') as f:  f.write(self.dataline % (t,dt, e,de, s,ds, b,db, c,dc))
 
@@ -399,25 +401,48 @@ class EMSResults:
 #    self.rc.cd(4); self.rc.GetPad(4).SetGrid();  self.BF.Fit('pol0'); self.BF.Draw('AP');
 #    self.BF.GetXaxis().SetTitle('time');         self.BF.GetYaxis().SetTitle('Bending field [T]')
 
-    self.rc.Modified()
-    self.rc.Update()
-    self.rc.SaveAs(self.roofile + '.pdf')
-    raw_input()
+    self.rc.Modified();  self.rc.Update();  self.rc.SaveAs(self.roofile + '.pdf')
 
-
+  def EnergySpread(self):
+    n, m, k, l = self.ReadGraphs()
+    t, e, s, i = ROOT.Double(), ROOT.Double(), ROOT.Double(), ROOT.Double()
+    xmin, xmax = 100.0, 0.0
+    ymin, ymax = 10.0,  0.0
+    for p in range(n):
+      self.BE.GetPoint(p,t,e); de = self.BE.GetErrorY(p)
+      self.BS.GetPoint(p,t,s); ds = self.BS.GetErrorY(p)
+      self.BC.GetPoint(p,t,i); di = self.BC.GetErrorY(p)
+      if abs(di/i)<0.5 and abs(ds/s)<0.5:
+        S, dS = 10.*s/e, 10.*ds/e
+        self.SI.Fill(i,S,1./dS**2)
+        xmin = min(xmin, i-di);  xmax = max(xmax, i+di)
+        ymin = min(ymin, S-dS);  ymax = max(ymax, S+dS)
+    self.SI.GetXaxis().SetTitle('Current [mA]');                  #self.SI.GetXaxis().SetLabelOffset(0.03)
+    self.SI.GetXaxis().SetRangeUser(xmin, xmax)
+    self.SI.GetYaxis().SetTitle('#sigma_{E}/E #upoint 10^{-4}');  #self.SI.GetYaxis().SetLabelOffset(0.02)
+    self.SI.GetYaxis().SetRangeUser(ymin, ymax)
+    self.SI.SetMarkerColor(ROOT.kRed); self.SI.SetLineColor(ROOT.kRed)
+    self.SI.SetMarkerStyle(20); self.SI.SetMarkerSize(1.25); self.SI.GetYaxis().SetDecimals()
+    self.sc = ROOT.TCanvas('sc','BEMS results for VEPP-2000', 0, 0, 1200, 800)
+    self.sc.cd(), self.sc.SetGrid()
+    self.SI.Draw()
+    self.sc.Modified();  self.sc.Update();  self.sc.SaveAs(self.espread)
 
 class Points_Splitter:
-  ENERGY_CHANGE = 2.0
+  ENERGY_CHANGE = 5.0
   SMALL_CURRENT = 5.0
   E_MIN,  E_MAX = 100., 1000.
   success = []
   failure = []
 
   def Go(self, flist, todo):
+    from hpge import DataFile
     T = DataFile()
     T.ReadHat(flist[0], 100)
     BDATE = str(int(T.HAT['Date']))
-    E0    = VEPP2K_DB().GetRunInfo([flist[0]])['E']
+    R = VEPP2K_DB().GetRunInfo([flist[0]])
+    if R: E0 = R['E']
+    else: E0 = 0.0
 
     while len(flist):
       f = flist.pop(0)
@@ -426,18 +451,23 @@ class Points_Splitter:
       R = VEPP2K_DB().GetRunInfo([f])
       if T and R:
         E, dE, I, dI = R['E'], R['dE'], R['I'], R['dI']
-
         SUCCESS = self.E_MIN < E < self.E_MAX
         SUCCESS = dt > 100.  and    dE  < self.ENERGY_CHANGE
         SUCCESS = SUCCESS and abs(E-E0) < self.ENERGY_CHANGE
         SUCCESS = SUCCESS and         I > self.SMALL_CURRENT
+        SUCCESS = SUCCESS and len(flist)
 
         FAILURE  = E < self.E_MIN or  I < self.SMALL_CURRENT
         FAILURE  = FAILURE        or dE > self.ENERGY_CHANGE
+        FAILURE  = FAILURE        and len(flist)
 
-        if   SUCCESS:         self.success.append(f)
-        elif FAILURE:         self.failure.append(f)
-        elif abs(R['E']-E0) > self.ENERGY_CHANGE:
+        PFINISH   = self.E_MIN < E < self.E_MAX
+        PFINISH   = PFINISH and abs(E-E0) > self.ENERGY_CHANGE
+        PFINISH   = PFINISH or len(flist)==0
+
+        if   SUCCESS:    self.success.append(f)
+        elif FAILURE:    self.failure.append(f)
+        elif PFINISH:
           EDATE  = str(int(T.HAT['Date']))
           folder = '%8s-%8s~%3.0fMeV' % (BDATE, EDATE, E0)
           print folder

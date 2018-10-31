@@ -4,9 +4,9 @@ import os, sys, getopt, time, string, gzip, ConfigParser
 
 def Usage():
   print '''
- ╔ Python script to process HPGe spectra. © 2005-2018 N.Yu.Muchnoi ═══════════════╗
+ ╔ Python script to process HPGe spectra. © 2005-2018 Nickolai Muchnoi ═══════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update: October 13, 2018  │ ║
+ ║ Usage: %0000000012s [options]               │ Last update: October 31, 2018  │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -19,16 +19,16 @@ def Usage():
  ║ -e YYYYMMDD, --efolder = YYYYMMDD : date to  end  with (year, month, day).     ║
  ║ -t HHMMSS,   --time    = HHMMSS   : time from which to start (hour, min, sec). ║
  ║ -c filename, --cfg     = filename : file to read various parameters,           ║
- ║                                     otherwise "default.cfg" is used.           ║
+ ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
  ║                                     otherwise "escale.root" is used.           ║
  ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
  ║              --edge               : try to measure beam energy by Compton edge.║
  ║              --escan              : deal with beam energy scan experiment.     ║
- ║ -g       ,   --generate           : generate subfolders with 'success.list'    ║
- ║                                     and 'failure.list' file containers.        ║
  ║ -p folder,   --point   = folder   : subfolder under the working folder,        ║
  ║                                     where there is the 'success.list' file.    ║
+ ║ -g       ,   --generate           : generate subfolders with 'success.list'    ║
+ ║                                     and 'failure.list' file containers.        ║
  ╚════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
 
@@ -47,17 +47,17 @@ else:
 class ToDo:
 
   def __init__(self):
-
     cfg = ConfigParser.ConfigParser(); cfg.read('_globals_.cfg')
     if cfg.has_option('globals', 'data_folder'):  self.root = cfg.get('globals', 'data_folder')
     else:                                         exit()
     if cfg.has_option('globals', 'data_origin'):  self.orig = cfg.get('globals', 'data_origin')
     else:                                         exit()
+
     try:
-      Years = os.listdir(self.root); Years.sort()
+      Years = os.listdir(self.root);       Years.sort()
     except OSError:
-      print 'root folder does not exist!'
-      sys.exit(1)
+      print 'root folder does not exist!'; exit()
+
     Days  = os.listdir(self.root+Years[-1])
     if len(Days)==1: Days.extend(os.listdir(self.root+Years[-2]));
     Days.sort()
@@ -105,7 +105,7 @@ class ToDo:
   def GetList(self):
     if self.point != './':
       try:
-        with open('%ssuccess.list' % (self.point)) as fp: file_list = fp.readlines()
+        with open('%ssuccess.list' % self.point) as fp: file_list = fp.readlines()
       except IOError:
         print 'Folder does not exist!'; exit()
       for i in range(len(file_list)): file_list[i] = file_list[i].strip('\n')
@@ -177,10 +177,9 @@ class Histogram:
       self.hps.Scale(0)
       while n < self.nfile:
         if SPEC.ReadData(flist[0], self.nbins, self.tmin):
-          if n==0:
-            self.UTB = SPEC.utb
-          elif (SPEC.utb - self.UTE) > 1800:
-            break
+          if n==0: self.UTB = SPEC.utb
+          elif (SPEC.utb - self.UTE) > 1800:  break
+
           self.UTE = SPEC.ute;  self.LiveT += SPEC.tLive;  n += 1;  filechain.append(flist[0])
           for nbin in range(self.nbins): self.hps.SetBinContent(nbin, self.hps.GetBinContent(nbin) + SPEC.DATA[nbin])
           print 'Add:', flist[0]
@@ -239,6 +238,8 @@ class DataFile:
         try:                self.HAT[T[0]] = float(T[1])
         except ValueError:  self.HAT[T[0]] = T[1]
 
+#    self.PB5 = [0.800, 0.900, 1.100, 1.500, 1.800, 2.000, 2.500, 2.800, 3.200, 3.700, 4.500, 5.200, 5.400, 5.600]
+
     if self.HAT['Tlive']>tmin:
       self.tLive = self.HAT['Tlive']
       self.utb   = UnixTime(self.HAT['Begin'], self.HAT['Date'])
@@ -275,11 +276,15 @@ def main(argv):
         from vepp2k.vepp2k import EMSResults
         A = EMSResults(todo.cfg_file, todo.point)
         A.ShowRunInfo()
+        A.EnergySpread()
+        raw_input()
     elif todo.generate:
       if 'VEPP2K' in todo.orig:
-        from vepp2k.vepp2k import Points_Splitter
-        A = Points_Splitter()
-        A.Go(flist,todo)
+        T = raw_input('Do you understand what you are going to do?')
+        if 'Y' in T or 'y' in T:
+          from vepp2k.vepp2k import Points_Splitter
+          A = Points_Splitter()
+          A.Go(flist,todo)
     elif todo.verify:
       from scale.isotopes import Isotopes
       A = Isotopes(todo.scalefile, todo.cfg_file, 'verification')

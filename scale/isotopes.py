@@ -88,6 +88,8 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.PeaksTable()
       self.Show_Energy_Resolution(self.Do_Energy_Resolution())
       self.Save_Calibration()
+    else:
+      raw_input('Scale calibration is impossible!')
     return self.zero, self.gain
       #      for i in range(7): self.PADS[i].SaveAs('PAD%1d.eps' % i)
 
@@ -254,6 +256,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
         self.S1.SetPoint(     n,  x,  y);  self.S1.SetPointError(n, dx, dy)
         X.append(x); Y.append(y); W.append(1.0/dy)
       self.spline.Reset(X,Y,W)
+    else: self.S1.Set(0)
 
 # 2) JUST SHOW OTHER GAMMA LINES
     self.S2.Set(self.nOtherPeaks)
@@ -300,6 +303,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       print ' ╔ Resolution by pulser: ═══╤══════════════════════════════╤══════════════════════╗'
       print ' ║ Noise: %5.3f ± %5.3f keV │ Slope:  %6.3f ± %5.3f ppm   │ χ2/NDF:   %5.1f/%3d  ║' % PP
       print ' ╚══════════════════════════╧══════════════════════════════╧══════════════════════╝\n'
+    else: self.RP.Set(0)
 
 # 2. Resolution by isotopes for calibration
     N = self.nShapePeaks; self.RC.Set(2*N)

@@ -15,8 +15,8 @@ class USpline:  # class # class # class # class # class # class # class # class 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class Isotopes(Atlas): # class # class # class # class # class # class # class # class # class # class # class # class # class
   pce    = 2.96e-3     # electron-hole pair creation energy in Ge, keV
-  Colors = [ROOT.kRed+2, ROOT.kBlue+2, ROOT.kGreen+3, ROOT.kGray+2]
-  Styles = [20,  21,  22,   23];    Sizes  = [1.2, 1.0, 1.25, 1.25]
+  Colors = [ROOT.kRed+2, ROOT.kGreen+3, ROOT.kBlue+2]
+  Styles = [20,  22,  24];    Sizes  = [1.25, 1.0, 1.0]
   emin, emax = 100., 10000.  # just for a case when no *.cfg file is present
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -54,15 +54,15 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.cnst     = ROOT.TF1('cnst', '[0]',                        self.emin, self.emax)
     self.spline   = USpline()
     self.SplineU  = ROOT.TF1('SplineU', self.spline, self.emin, self.emax, 0)
-    self.SplineU.SetLineColor(self.Colors[3]); self.SplineU.SetLineWidth(2); self.SplineU.SetNpx(250);
+    self.SplineU.SetLineColor(self.Colors[1]); self.SplineU.SetLineWidth(2); self.SplineU.SetNpx(250);
     # Energy Resolution Section
     self.ERG      = ROOT.TMultiGraph(); self.ERG.SetTitle('#sigma_{E} / E [%]')
     self.eres_C   = ROOT.TF1('eres_C', ResolutionModel(), -self.emax, self.emax, 4) # combined resolution model [%]
     self.eres_C.SetParameters(1.0,  0.24, 0.1e-6, 100.0); self.eres_C.SetLineColor(self.Colors[0])
-    self.eres_C.SetParLimits( 0,    0.40, 10.00);        self.eres_C.SetParLimits(1, 0.05, 0.500)
+    self.eres_C.SetParLimits( 0,    0.40, 10.00);         self.eres_C.SetParLimits(1, 0.05, 0.500)
     self.eres_C.SetParLimits( 2,    0.005e-6, 0.15e-6)
     self.pulser   = ROOT.TF1('pulser', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
-    self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[2])
+    self.pulser.SetParameters(1.0, 0.0); self.pulser.SetLineColor(self.Colors[1])
     self.InitGraphics()
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def __del__(self):
@@ -79,7 +79,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     self.findPeaks()
     self.identifyPeaks()
     self.ShowScale(0)
-    if self.nScalePeaks>2:
+    if len(self.ScalePeaks)>2:
       for iteration in range(self.nitr):
         self.fitPeaks(L = self.fitL, R = self.fitR)
         self.Do_Energy_Scale();
@@ -98,7 +98,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
   def PB5lines(self):
     self.atlas['PB5'], N = [], len(self.PB5)
     for i in range(N):
-      self.atlas['PB5'].append({'Key':str(i), 'W': self.zero_p + self.gain_p*self.PB5[i], 'dW':self.peer_p, 'CC':False, 'RC':False})
+      self.atlas['PB5'].append({'W': self.zero_p + self.gain_p*self.PB5[i], 'dW':self.peer_p})
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def findPeaks(self):
@@ -128,32 +128,28 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def identifyPeaks(self):
-    self.KnownPeaks = []
-    for p in self.FoundPeaks:
+    self.ScalePeaks, self.PulsePeaks, self.OtherPeaks = [], [], []
+    while len(self.FoundPeaks):
+      x = self.FoundPeaks[0]['E']
+      name = False
       for nucl,lines in self.atlas.iteritems():
         for line in lines:
-          name     = "%5s(%4s)" % (nucl,line['Key'])
-          E_t, dE_t  = line['W'], line['dW']
-          if abs(p['E']-E_t) < self.erec or ((abs(p['E']-E_t) < 2*self.erec) and ('PB5' in name)):
-            self.KnownPeaks.append({'name':name, 'E':E_t, 'dE':dE_t, 'X':p['E'], 'A':p['A'], 'B':p['B'], 'incc':line['CC'], 'inrc':line['RC']})
-    self.KnownPeaks.sort(key = lambda peak: peak['E'])
-    self.ScalePeaks  = [el for el in self.KnownPeaks if          el['incc']];       self.nScalePeaks = len(self.ScalePeaks)
-    self.ShapePeaks  = [el for el in self.KnownPeaks if          el['inrc']];       self.nShapePeaks = len(self.ShapePeaks)
-    self.PulsePeaks  = [el for el in self.KnownPeaks if 'PB5' in el['name']];       self.nPulsePeaks = len(self.PulsePeaks)
-    ### this is to remove wrongly determined peaks
-    i=0
-    while (i<self.nPulsePeaks-1):
-      if self.PulsePeaks[i]['name'] == self.PulsePeaks[i+1]['name']:
-        if self.PulsePeaks[i]['A']<self.PulsePeaks[i+1]['A']:  del self.PulsePeaks[i]
-        else:                                                  del self.PulsePeaks[i+1]
-        self.nPulsePeaks -= 1
-      else:  i += 1
-    ###
-    self.OtherPeaks  = [el for el in self.KnownPeaks if not el in self.PulsePeaks]
-    self.OtherPeaks  = [el for el in self.OtherPeaks if not el in self.ScalePeaks]
-    self.nOtherPeaks = len(self.OtherPeaks)
-    self.PB5 = self.nPulsePeaks > 5
-#    for e in self.KnownPeaks: print e['name'], e['E'], e['X']
+          if abs(x - line['W']) < self.erec:
+            name = "%5s(%4s)" % (nucl, lines.index(line))
+            V = {'name':name, 'E':line['W'], 'dE':line['dW'], 'X':x, 'A':self.FoundPeaks[0]['A'], 'B':self.FoundPeaks[0]['B']}
+            if  'PB5' in name:       self.PulsePeaks.append(V)
+            elif name in self.scale: self.ScalePeaks.append(V)
+            else:                    self.OtherPeaks.append(V)
+            break
+        else:
+          continue
+        break
+      if not name: print 'Unknown line: %.3f keV' % self.FoundPeaks[0]['E']
+      self.FoundPeaks.pop(0)
+
+    self.ScalePeaks.sort(key = lambda p: p['E'])
+    self.PulsePeaks.sort(key = lambda p: p['E'])
+    self.OtherPeaks.sort(key = lambda p: p['E'])
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -185,10 +181,9 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       if OK or not ALREADY:
         p['shape'] = P
       else:
-        if   p in self.ScalePeaks: self.ScalePeaks.remove(p); self.nScalePeaks -= 1
-        elif p in self.PulsePeaks: self.PulsePeaks.remove(p); self.nPulsePeaks -= 1
-        elif p in self.ShapePeaks: self.ShapePeaks.remove(p); self.nShapePeaks -= 1; self.OtherPeaks.remove(p); self.nOtherPeaks -= 1
-        elif p in self.OtherPeaks: self.OtherPeaks.remove(p); self.nOtherPeaks -= 1
+        if   p in self.ScalePeaks: self.ScalePeaks.remove(p)
+        elif p in self.PulsePeaks: self.PulsePeaks.remove(p)
+        elif p in self.OtherPeaks: self.OtherPeaks.remove(p)
       if   self.names[0] in p['name']: self.Show_Peak(p, L, R, 3)
       elif self.names[1] in p['name']: self.Show_Peak(p, L, R, 4)
       elif self.names[2] in p['name']: self.Show_Peak(p, L, R, 5)
@@ -235,7 +230,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
   def Do_Energy_Scale(self):
     K = 'shape'
 # 0) LINEAR SCALE CORRECTION WITH CALIBRATION GAMMA LINES
-    self.S0.Set(self.nScalePeaks)
+    self.S0.Set(len(self.ScalePeaks))
     for pk in self.ScalePeaks:
       n = self.ScalePeaks.index(pk)
       self.S0.SetPoint(     n, pk[ 'E'],  pk[K]['p1'] - pk['E'])
@@ -244,22 +239,21 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     k0,  k1 = self.lisc.GetParameter(0), self.lisc.GetParameter(1)
     self.zero = (self.zero-k0)/(1.+k1);     self.gain /= (1.+k1)
     self.hps.SetBins(self.nbins, self.zero, self.zero + self.gain * self.nbins)
-    for pk in self.KnownPeaks: pk['X'] = (pk['X']-k0)/(1.+k1)
 
 # 1) SPLINE FOR PULSER LINES
     if self.PB5:
       X, Y, W = [],[],[]
-      self.S1.Set(self.nPulsePeaks)
+      self.S1.Set(len(self.PulsePeaks))
       for pk in self.PulsePeaks:
         n = self.PulsePeaks.index(pk)
         x, y, dx, dy = pk['E'], pk[K]['p1'] - pk['E'], pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2)**0.5
         self.S1.SetPoint(     n,  x,  y);  self.S1.SetPointError(n, dx, dy)
-        X.append(x); Y.append(y); W.append(1.0/dy)
+        X.append(x); Y.append(y); W.append(1.0/dy**2)
       self.spline.Reset(X,Y,W)
     else: self.S1.Set(0)
 
 # 2) JUST SHOW OTHER GAMMA LINES
-    self.S2.Set(self.nOtherPeaks)
+    self.S2.Set(len(self.OtherPeaks))
     for pk in self.OtherPeaks:
       n = self.OtherPeaks.index(pk)
       self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
@@ -295,7 +289,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 
 # 1. Resolution by pulser (noise level)
     if self.PB5:
-      self.RP.Set(self.nPulsePeaks)
+      self.RP.Set(len(self.PulsePeaks))
       for p in self.PulsePeaks:
         n = self.PulsePeaks.index(p);
         self.RP.SetPoint(n, p['E'], 100*p[K]['p2']/p['E']); self.RP.SetPointError(n, p['dE'], 100*p[K]['dp2']/p['E'])
@@ -306,14 +300,14 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     else: self.RP.Set(0)
 
 # 2. Resolution by isotopes for calibration
-    N = self.nShapePeaks; self.RC.Set(2*N)
-    for p in self.ShapePeaks:
-      n = self.ShapePeaks.index(p)
+    N = len(self.ScalePeaks); self.RC.Set(2*N)
+    for p in self.ScalePeaks:
+      n = self.ScalePeaks.index(p)
       self.RC.SetPoint(N-n-1, -p['E'], 100*p[K]['p3']/p['E']); self.RC.SetPointError(N-n-1, p['dE'], 100*p[K]['dp3']/p['E'])
       self.RC.SetPoint(N+n,    p['E'], 100*p[K]['p2']/p['E']); self.RC.SetPointError(N+n,   p['dE'], 100*p[K]['dp2']/p['E'])
 
 # 3. Resolution for other isotopes
-    OP = [p for p in self.OtherPeaks if p not in self.ShapePeaks]; N = len(OP); self.RO.Set(2*N)
+    OP = [p for p in self.OtherPeaks if p not in self.ScalePeaks]; N = len(OP); self.RO.Set(2*N)
     for p in OP:
       n = OP.index(p);
       self.RO.SetPoint(N-n-1, -p['E'], 100*p[K]['p3']/p['E']); self.RO.SetPointError(N-n-1, p['dE'], 100*p[K]['dp3']/p['E'])
@@ -394,8 +388,10 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def InitParameters(self, cfg_file):
-    self.names = ['Cs137(   0)', 'Co60 (   0)', 'Tl208(  23)', ' O16 (   0)']
+    self.scale = ['Cs137(   0)', 'Co60 (   0)', 'Co60 (   1)', 'Tl208(  23)']
+    self.names = self.scale
     cfg = ConfigParser.ConfigParser(); cfg.read(cfg_file)
+
     S = 'scale'
     if cfg.has_section(S):
       self.zero = cfg.getfloat(S, 'zero');    self.gain = cfg.getfloat(S, 'gain')
@@ -405,33 +401,33 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.nitr = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
       if cfg.has_option(S, 'thre'):           self.rep3 = cfg.getfloat(S, 'thre')
       else:                                   self.rep3 = 0.0
-      if cfg.has_option(S, 'name0'): self.names[0] = '%11s' % cfg.get(S, 'name0')
-      if cfg.has_option(S, 'name1'): self.names[1] = '%11s' % cfg.get(S, 'name1')
-      if cfg.has_option(S, 'name2'): self.names[2] = '%11s' % cfg.get(S, 'name2')
-      if cfg.has_option(S, 'name3'): self.names[3] = '%11s' % cfg.get(S, 'name3')
+      if cfg.has_option(S, 'escale'): self.scale = cfg.get(S, 'escale').split(', ')
+      if cfg.has_option(S, 'toshow'): self.names = cfg.get(S, 'toshow').split(', ')[0:4]
+    else:
+      print 'Can not read configuration for scale!'; exit()
 
-    else: print 'Can not read configuration for scale!'; exit()
     S = 'pulser'
     if cfg.has_section(S):
       self.zero_p = cfg.getfloat(S, 'zero_p'); self.gain_p = cfg.getfloat(S, 'gain_p'); self.peer_p = cfg.getfloat(S, 'peer_p')
-    else: print 'Can not read configuration for pulser!'
+    else:
+      print 'Can not read configuration for pulser!'
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def InitGraphics(self):
     # Energy Scale Section
     self.S0   = ROOT.TGraphErrors(); self.S0.SetMarkerColor(self.Colors[0]); self.S0.SetMarkerStyle(self.Styles[0]); self.S0.SetMarkerSize(self.Sizes[0])
-    self.S1   = ROOT.TGraphErrors(); self.S1.SetMarkerColor(self.Colors[2]); self.S1.SetMarkerStyle(self.Styles[2]); self.S1.SetMarkerSize(self.Sizes[2])
-    self.S2   = ROOT.TGraphErrors(); self.S2.SetMarkerColor(self.Colors[1]); self.S2.SetMarkerStyle(self.Styles[1]); self.S2.SetMarkerSize(self.Sizes[1])
+    self.S1   = ROOT.TGraphErrors(); self.S1.SetMarkerColor(self.Colors[1]); self.S1.SetMarkerStyle(self.Styles[1]); self.S1.SetMarkerSize(self.Sizes[1])
+    self.S2   = ROOT.TGraphErrors(); self.S2.SetMarkerColor(self.Colors[2]); self.S2.SetMarkerStyle(self.Styles[2]); self.S2.SetMarkerSize(self.Sizes[2])
     self.NLG.Add(self.S0); self.NLG.Add(self.S1); self.NLG.Add(self.S2)
     self.Lg1  = ROOT.TLegend(0.62, 0.85, 0.99, 1.00, '', 'brNDC')
     self.Lg1.AddEntry(self.S0, 'reference lines', 'lpe')
     self.Lg1.AddEntry(self.S1, 'pulser lines',    'lpe')
     self.Lg1.AddEntry(self.S2, 'other lines',     'lpe')
     # Energy Resolution Section
-    self.RC   = ROOT.TGraphErrors(); self.RC.SetMarkerColor(self.Colors[0]); self.RC.SetMarkerStyle(self.Styles[0]); self.RC.SetMarkerSize(1.20)
-    self.RO   = ROOT.TGraphErrors(); self.RO.SetMarkerColor(self.Colors[1]); self.RO.SetMarkerStyle(self.Styles[1]); self.RO.SetMarkerSize(1.20)
-    self.RP   = ROOT.TGraphErrors(); self.RP.SetMarkerColor(self.Colors[2]); self.RP.SetMarkerStyle(self.Styles[2]); self.RP.SetMarkerSize(0.80)
+    self.RC   = ROOT.TGraphErrors(); self.RC.SetMarkerColor(self.Colors[0]); self.RC.SetMarkerStyle(self.Styles[0]); self.RC.SetMarkerSize(self.Sizes[0])
+    self.RP   = ROOT.TGraphErrors(); self.RP.SetMarkerColor(self.Colors[2]); self.RP.SetMarkerStyle(self.Styles[1]); self.RP.SetMarkerSize(self.Sizes[1])
+    self.RO   = ROOT.TGraphErrors(); self.RO.SetMarkerColor(self.Colors[1]); self.RO.SetMarkerStyle(self.Styles[2]); self.RO.SetMarkerSize(self.Sizes[2])
     self.ERG.Add(self.RC); self.ERG.Add(self.RP); self.ERG.Add(self.RO)
     self.Lg2  = ROOT.TLegend(0.62, 0.75, 0.99, 1.00, '', 'brNDC')
 

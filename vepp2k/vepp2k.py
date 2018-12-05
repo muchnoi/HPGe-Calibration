@@ -24,6 +24,13 @@ class Constants:
 class EDGE(Constants):
 
   def __init__(self, scalefile, cfg_file, folder):
+    self.CO_Grating = {0  : 5.426463e-6,
+                       250: 5.426463e-6,
+                       252: 5.426463e-6,
+                       322: 5.604325e-6,
+                       324: 5.604325e-6,
+                       325: 5.617221e-6,
+                       327: 5.617221e-6}
     self.exclude = []
     cfg = ConfigParser.ConfigParser(); cfg.read(cfg_file)
     self.MinAmp  = cfg.getfloat('edge', 'MinAmpEdge')
@@ -60,7 +67,18 @@ class EDGE(Constants):
     self.cc.cd(); self.cc.Clear()
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Go(self, UTB, UTE, hps, filechain):
+  def Go(self, UTB, UTE, hps, filechain, grating):
+
+    if 0.15<Constants.wo<0.95:
+      if self.CO_Grating.has_key(grating):
+        print '%3d: %8.6f um' % (grating, 1.e+6*self.CO_Grating[grating])
+        Constants.wo = Constants.h*Constants.c/self.CO_Grating[grating]  # laser photon energy [eV]
+        Constants.Eo = 0.25e-6 * Constants.me**2 / Constants.wo # (me^2/4wo) [MeV]
+      else:
+        print grating
+        raw_input()
+        return False
+
     R = VEPP2K_DB().GetRunInfo(filechain)
     if R:
       print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗'
@@ -84,7 +102,9 @@ class EDGE(Constants):
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
       # get rid of spikes:
-      self.EP.append(727 ); self.EP.append(860 ); self.EP.append(1294);  self.EP.append(1461); self.EP.append(2103)
+      self.EP.append(583 ); self.EP.append(596 )
+      self.EP.append(511 ); self.EP.append(564 ); self.EP.append(727 );
+      #self.EP.append(860 ); self.EP.append(1294); self.EP.append(1461); self.EP.append(2103)
       for spike in self.EP:
         lo = 1 + int((spike - zero - 4 * self.RL)/(gain*float(self.Merger)))
         hi = 1 + int((spike - zero + 5 * self.RR)/(gain*float(self.Merger)))
@@ -151,20 +171,23 @@ class EDGE(Constants):
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self, W, LBK):
-    K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
+    K = 2.e+3*W/Constants.me; Wmin = W/(1+K);
+    E1, E2 = W -     LBK*Wmin, W +     LBK*Wmin
+    C1, C2 = W - 0.9*LBK*Wmin, W + 0.9*LBK*Wmin
     def FitP(H, P, q):
-      convol = ROOT.TF1Convolution('simple', 'spreso', 0.98*E1, 1.02*E2); convol.SetNofPointsFFT(1000)
-      comple = ROOT.TF1('comple', convol, E1, E2, 10);  comple.SetNpx(1000)
+      convol = ROOT.TF1Convolution('simple', 'spreso', E1, E2); convol.SetNofPointsFFT(1000)
+      comple = ROOT.TF1('comple', convol, C1, C2, 10);  comple.SetNpx(1000)
       comple.SetParameters(np.fromiter(P, np.float))
       if self.Radius: comple.FixParameter(1, self.Bo)
       comple.FixParameter(7, self.RR);  comple.FixParameter(8, self.RL)
+      comple.SetParLimits(9,0.1,100.0)
       R = H.Fit('comple','RSQN')
       if self.Radius: comple.ReleaseParameter(1)
       comple.ReleaseParameter(7);       comple.ReleaseParameter(8)
       q.put([R.Status(), R.Chi2(), R.Ndf(), R.Prob(), fitParameters(comple)])
 
 
-    self.convol.SetRange(E1, E2);            self.comple.SetRange(E1*1.005, E2*0.995)
+    self.convol.SetRange(E1, E2);            self.comple.SetRange(C1, C2)
     self.simple.SetLineColor(ROOT.kBlue);    self.comple.SetLineColor(ROOT.kRed);
     P = fitParameters(self.simple)['p'];     P.extend([self.RR, self.RL, 1.0])
     self.comple.SetParameters(np.fromiter(P, np.float))
@@ -177,7 +200,7 @@ class EDGE(Constants):
     pE = np.fromiter(R[4]['e'], np.float); self.comple.SetParErrors( pE)
     p.join()
 
-    if not status and pV[9]>0.1:
+    if not status:
 #      tilt     = (1e+3*pV[3], 1e+3*pE[3], 1e+6*pV[4], 1e+6*pE[4])
       k        =  4e+6*pV[0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       deriv    = (1.+k)**2/k/(2.+k) # dE/dWmax, apply scale correcion to the beam energy:

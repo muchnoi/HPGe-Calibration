@@ -6,7 +6,7 @@ def Usage():
   print '''
  ╔ Python script to process HPGe spectra. © 2005-2018 Nickolai Muchnoi ═══════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update: October 31, 2018  │ ║
+ ║ Usage: %0000000012s [options]               │ Last update: December 4, 2018  │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -22,18 +22,30 @@ def Usage():
  ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
  ║                                     otherwise "escale.root" is used.           ║
+ ║              --toi                : show the table of known isotopes.          ║
  ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
  ║              --edge               : try to measure beam energy by Compton edge.║
  ║              --escan              : deal with beam energy scan experiment.     ║
- ║ -p folder,   --point   = folder   : subfolder under the working folder,        ║
- ║                                     where there is the 'success.list' file.    ║
  ║ -g       ,   --generate           : generate subfolders with 'success.list'    ║
  ║                                     and 'failure.list' file containers.        ║
+ ║ -p folder,   --point   = folder   : subfolder under the working folder,        ║
+ ║                                     where there is the 'success.list' file.    ║
  ╚════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
 
+def List_TOI():
+  from scale.atlas import Atlas
+  OUT = {}
+  for k,v in Atlas().atlas.iteritems():
+    for el in v:
+      OUT[el['W']] = "%5s(%4s): Eγ = %9.3f ± %5.3f keV" % (k, v.index(el), el['W'], el['dW'])
+  for key in sorted(OUT.keys()): print OUT[key]
+  sys.exit(0)
+
 if ('-h' in sys.argv) or ('--help' in sys.argv):
   Usage()
+elif ('--toi' in sys.argv):
+  List_TOI()
 else:
   import ROOT
 #  ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
@@ -74,7 +86,8 @@ class ToDo:
   def Options(self,argv):
     S = D = E = False
     sopt = "c:d:e:f:n:p:s:t:v:ghikl"
-    lopt = ["cfg=","folder=","efolder=","file=","time=","nfiles=","scale=","verify=","point=","generate","interactive","help","keV","list","edge","escan"]
+    lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=",
+            "generate", "interactive", "help", "keV", "list", "edge", "escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
@@ -109,6 +122,7 @@ class ToDo:
       except IOError:
         print 'Folder does not exist!'; exit()
       for i in range(len(file_list)): file_list[i] = file_list[i].strip('\n')
+      file_list = [el for el in file_list if self.filename in el]
     else:
       fold_list, file_list = [], []
       if self.online and os.path.exists(self.root + time.strftime("%Y/%Y%m%d/")): self.efolder = time.strftime("%Y%m%d")
@@ -208,7 +222,7 @@ class Histogram:
       if self.tokeV:
         R = self.CALIBRATION.Do(self.UTB, self.UTE, SPEC.PB5, self.hps, ptype)
       elif self.EME:
-        R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain)
+        R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain, SPEC.Grate)
       else:
         R = 0
         self.hps.GetXaxis().SetTitle('E_{#gamma}, channels')
@@ -223,6 +237,7 @@ class DataFile:
   DATA, HAT, PB5         = [], {}, []
   utb, ute, Tlive, pType = 0, 0, 0, 'None'
 #  TZ = 8 * 3600 # China TimeZone: GMT +8
+
   def ReadHat(self,ifile,tmin): # reads hat of spectrum
     def UnixTime(t,d):
       H,S = divmod(t,3600); M,S = divmod(S,60)
@@ -244,8 +259,10 @@ class DataFile:
       self.tLive = self.HAT['Tlive']
       self.utb   = UnixTime(self.HAT['Begin'], self.HAT['Date'])
       self.ute   = UnixTime(self.HAT['End'],   self.HAT['eDate'])
-      if self.HAT.has_key('pType'): self.pType = self.HAT['pType']
-      else:                         self.pType = 'None'
+      if self.HAT.has_key('pType'):   self.pType = self.HAT['pType']
+      else:                           self.pType = 'None'
+      if self.HAT.has_key('GRATING'): self.Grate = int(self.HAT['GRATING'])
+      else:                           self.Grate = 0
       return True
     else:
       print 'Data acquisition time is to short, only %d seconds' % int(self.HAT['Tlive'])

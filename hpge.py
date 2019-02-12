@@ -13,6 +13,7 @@ def Usage():
  ║ -i,          --interactive        : if set, script will prompt to proceed.     ║
  ║ -k,          --keV                : use channels not keV.                      ║
  ║ -l,          --list               : just show the list of files.               ║
+ ║              --toi                : show the table of known isotopes.          ║
  ║ -f expr,     --file = expr        : file name(s) under specified folder(s).    ║
  ║ -n N,        --nf   = N           : put several files into one spectrum.       ║
  ║ -d YYYYMMDD, --folder  = YYYYMMDD : date to start from (year, month, day).     ║
@@ -22,7 +23,6 @@ def Usage():
  ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
  ║                                     otherwise "escale.root" is used.           ║
- ║              --toi                : show the table of known isotopes.          ║
  ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
  ║              --edge               : try to measure beam energy by Compton edge.║
  ║              --escan              : deal with beam energy scan experiment.     ║
@@ -177,8 +177,12 @@ class Histogram:
       try: from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file, todo.point)
       except ImportError: print 'V2K is not yet implemented'; exit(0)
     if self.tokeV:
-      from scale.isotopes import Isotopes
-      self.CALIBRATION = Isotopes(todo.scalefile, todo.cfg_file, 'calibration')
+      if 'HPGe' in todo.orig:
+        from scale.isotopes import Isotopes
+        self.CALIBRATION = Isotopes(todo.scalefile, todo.cfg_file, 'calibration')
+      else:
+        from scale.scale import Scale
+        self.CALIBRATION = Scale(todo.scalefile, todo.cfg_file, 'calibration')
     elif not self.EME:
       self.cv = ROOT.TCanvas('cv','HPGe spectrum', 2, 2, 1002, 1002)
 
@@ -303,8 +307,8 @@ def main(argv):
           A = Points_Splitter()
           A.Go(flist,todo)
     elif todo.verify:
-      from scale.isotopes import Isotopes
-      A = Isotopes(todo.scalefile, todo.cfg_file, 'verification')
+      from scale.scale import Scale
+      A = Scale(todo.scalefile, todo.cfg_file, 'verification')
       A.Check_Scale(todo.energy, todo.prompt)
     else:
       A = Histogram(todo)

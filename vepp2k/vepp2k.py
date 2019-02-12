@@ -537,9 +537,3 @@ def fitParameters(fitf):
   return {'p':p,'e':e}
 
 
-#import gc
-#print gc.isenabled()
-#gc.disable()
-#print gc.isenabled()
-#print gc.collect()
-

@@ -11,10 +11,9 @@ class USpline:  # class # class # class # class # class # class # class # class 
   def __call__(self, x):      return self.uspline(x[0])
 
 
-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-class Isotopes(Atlas): # class # class # class # class # class # class # class # class # class # class # class # class # class
+class Scale(Atlas): # class # class # class # class # class # class # class # class # class # class # class # class # class
   Colors = [ROOT.kRed+2, ROOT.kGreen+3, ROOT.kBlue+2]
   Styles = [20,  22,  24];    Sizes  = [1.25, 1.0, 1.0]
   emin, emax = 100., 10000.  # just for a case when no *.cfg file is present
@@ -39,9 +38,9 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 
       self.SP = ROOT.TSpectrum()
       # Peaks Fitting Section
-      self.asps = ROOT.TF1('asps', LineShape(), 0.0, 1.0, 7);    self.asps.SetLineColor(ROOT.kBlue+2)
+      self.asps = ROOT.TF1('asps', LineShape(), 0.0, 1.0, 6);    self.asps.SetLineColor(ROOT.kBlue+2)
       self.asps.SetParNames('Amp','E_{0}, keV', '#sigma_{R}, keV', '#sigma_{L}, keV', 'Compton', 'Background')
-      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (0.5, 20.0),  (0.0,0.10), (0.0,1.e+5), (1., 10.))
+      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (0.5, 20.0),  (0.0,0.10), (0.0,1.e+5))
     else:
       self.cv   =  ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 502)
       self.PADS = [ROOT.TPad('PAD5', 'Scale',      0.01, 0.01, 0.49, 0.99, 0, 1),
@@ -158,13 +157,13 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       p1, ALREADY, PB5 = p['X'], p.has_key('shape'), 'PB5' in p['name']
       if ALREADY: # if peak was fitted already:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
         V = p['shape']
-        p0,p2,p3,p4,p5,p6 = V['p0'], V['p2'], V['p3'], V['p4'], V['p5'], V['p6']
+        p0,p2,p3,p4,p5 = V['p0'], V['p2'], V['p3'], V['p4'], V['p5']
         if not PB5: p1 = V['p1']
       else:   # if a peak was not fitted yet:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
         p0,   p2 = p['A'], 0.01 * p1 * (self.pulser.Eval(p1) if PB5 else self.eres_C.Eval(p1))
-        p3,p4,p5,p6 = p2,  0.00,  p['B'], 2.0
-      self.asps.SetRange(p1 - L*p3, p1 + R*p2);  self.asps.SetParameters(p0,p1,p2,p3,p4,p5,p6)
-      for np in xrange(7): self.asps.SetParLimits(np, self.p_limits[np][0], self.p_limits[np][1])
+        p3,p4,p5 = p2,  0.00,  p['B']
+      self.asps.SetRange(p1 - L*p3, p1 + R*p2);  self.asps.SetParameters(p0,p1,p2,p3,p4,p5)
+      for np in xrange(6): self.asps.SetParLimits(np, self.p_limits[np][0], self.p_limits[np][1])
       if PB5:
         self.asps.FixParameter(3,p2);
         self.asps.FixParameter(4,100.0)
@@ -581,16 +580,15 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class LineShape: # monochromatic gamma line responce  # class # class # class # class # class # class # class # class # class
   norm = 1./(2.*ROOT.TMath.Pi())**0.5
-  # P0  | P1 | P2      | P3      | P4      | P5         | P6
-  # Amp | X0 | Sigma_R | Sigma_L | Compton | Background | Exp. tail
+  # P0  | P1 | P2      | P3      | P4      | P5         |
+  # Amp | X0 | Sigma_R | Sigma_L | Compton | Background |
   def __call__(self, x, p):
     X = x[0]-p[1]
     if p[4]==100.0:
       return self.norm * ROOT.TMath.Exp(-0.5*(X/p[2])**2) * p[0]/p[2] + p[5]
     try:
-      if                  X >  0.0:   f =                 ROOT.TMath.Exp(-0.5*(X/p[2])**2)
-      elif   -p[6]*p[3] < X <  0.0:   f = p[4] + (1+p[4])*ROOT.TMath.Exp(-0.5*(X/p[3])**2)
-      else:                           f = p[4] + (1+p[4])*ROOT.TMath.Exp(p[6]*(X/p[3] + 0.5*p[6]))
+      if    X >  0.0:            f =                 ROOT.TMath.Exp(-0.5*(X/p[2])**2)
+      else:                      f = p[4] + (1-p[4])*ROOT.TMath.Exp(-0.5*(X/p[3])**2)
       return 2 * self.norm * f * p[0]/(p[2]+p[3]) + p[5]
     except OverflowError:
       print 'Overflow:', p[0], p[1], p[2], p[3], p[4], p[5]; raw_input()

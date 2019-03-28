@@ -3,7 +3,7 @@ import cPickle, os, time, ConfigParser
 import numpy as np
 import ROOT, sys
 from multiprocessing import Process, Queue
-from scale.isotopes  import Isotopes
+from scale.scale import Scale
 sql = True
 try:
   from temdbWO import Storage
@@ -33,15 +33,17 @@ class EDGE(Constants):
                        327: 5.617221e-6}
     self.exclude = []
     cfg = ConfigParser.ConfigParser(); cfg.read(cfg_file)
-    self.MinAmp  = cfg.getfloat('edge', 'MinAmpEdge')
-    self.Ranger  = cfg.getfloat('edge', 'EdgeRanger')
-    self.Merger  =   cfg.getint('edge', 'BinsMerger')
-    self.ETuner  = cfg.getfloat('edge', 'EveppTuner')
-    self.BTuner  = cfg.getfloat('edge', 'BveppTuner')
-    self.Radius  = cfg.getfloat('edge', 'VeppRadius')
-    self.Asymme  = cfg.getfloat('edge', 'Asymmetry')
-    self.SaveDB  = sql and ('True' in cfg.get('edge', 'SaveForSND'))
-    lwave        = cfg.getfloat('edge', 'WaveLength')       # laser wavelength [m]
+    self.MinAmp  = cfg.getfloat(  'edge', 'MinAmpEdge')
+    self.Ranger  = cfg.getfloat(  'edge', 'EdgeRanger')
+    self.Merger  =   cfg.getint(  'edge', 'BinsMerger')
+    self.ETuner  = cfg.getfloat(  'edge', 'EveppTuner')
+    self.BTuner  = cfg.getfloat(  'edge', 'BveppTuner')
+    self.Radius  = cfg.getfloat(  'edge', 'VeppRadius')
+    self.Asymme  = cfg.getboolean('edge', 'Asymmetry')
+    self.EdgeP2  = cfg.getboolean('edge', 'EdgePoly2')
+    self.SaveDB  = cfg.getboolean('edge', 'SaveForSND') and sql
+
+    lwave        = cfg.getfloat(  'edge', 'WaveLength')     # laser wavelength [m]
     Constants.wo = Constants.h*Constants.c/lwave            # laser photon energy [eV]
     Constants.Eo = 0.25e-6 * Constants.me**2 / Constants.wo # (me^2/4wo) [MeV]
 #    for i in range(10):
@@ -59,7 +61,7 @@ class EDGE(Constants):
     self.comple = ROOT.TF1('comple', self.convol, 1.0, 2.0, 10);    self.comple.SetNpx(1000)
 
     self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC');
-    self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
+    self.HPGe    = Scale(scalefile, cfg_file, 'application')
     self.plots   = EMSResults(cfg_file, folder)
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -136,23 +138,25 @@ class EDGE(Constants):
     # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |
     params = np.fromiter([self.Eo,  self.Bo, A, 0.0, 0.0, B, 0.0], np.float)
     self.simple.SetParameters(params); self.simple.SetRange(E1, E2); self.simple.SetNpx(1000)
-
-    if self.Radius: self.simple.FixParameter(1,self.Bo)
+    if self.Radius: self.simple.FixParameter(1, self.Bo)
+    if self.EdgeP2: self.simple.SetParLimits(4, 0.0, 0.01)
+    else:           self.simple.FixParameter(4, 0.0)
     R = self.hps.Fit('simple','RSQN'); OK = False
     if self.Radius: self.simple.ReleaseParameter(1)
+    if not self.EdgeP2: self.simple.ReleaseParameter(4)
 
 
     if not R.Status():
       E = fitParameters(self.simple)
-#      tilt = (1e+3*E['p'][3], 1e+3*E['e'][3], 1e+6*E['p'][4], 1e+6*E['e'][4])
+      tilt = (1e+3*E['p'][3], 1e+3*E['e'][3], 1e+6*E['p'][4], 1e+6*E['e'][4])
       print ' ╔ Simple Edge Fit: ═════════════╤══════════════════════╤═════════════════════════╗'
       print ' ║ Range from %5.0f to %5.0f keV │ E_beam = %7.2f MeV │   W_max = %9.3f keV ║' % (E1, E2, self.Eo, W)
       print ' ╟───────────────────────────────┴────────┬─────────────┴─────────────────────────╢'
       print ' ║ Beam energy: %8.3f ± %5.3f [MeV]    │ Bending field: %6.4f ± %6.4f [T]    ║' % (E['p'][0], E['e'][0], E['p'][1], E['e'][1])
       print ' ║ Background:  %8.0f ± %5.0f          │ Amplitude:   %8.0f ± %6.0f        ║' % (E['p'][5], E['e'][5], E['p'][2], E['e'][2])
-#      print ' ║ Edge tilt pol1: %5.3f ± %5.3f [1/eV]   │ Edge tilt pol2: %5.2f ± %5.2f [1/eV^2]║' % tilt
+      print ' ║ Edge tilt pol1: %5.1f ± %5.1f [1/eV]   │ Edge tilt pol2: %5.0f ± %5.0f [1/eV^2]║' % tilt
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
-      print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
+      print ' ║         χ²/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
       OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5)
       self.Legend.Clear();
@@ -160,14 +164,14 @@ class EDGE(Constants):
     else: OK = False
 
     self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
-    self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-50, E2+50)
+    self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-10, E2+10)
     self.cc.Modified(); self.cc.Update()
 
     if OK:
       k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
     else:
-      print 'Simple fit: bad fit, bad amplitude, spread or χ2';  return 0.0
+      print 'Simple fit: bad fit, bad amplitude, spread or χ²';  return 0.0
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self, W, LBK):
@@ -179,10 +183,14 @@ class EDGE(Constants):
       comple = ROOT.TF1('comple', convol, C1, C2, 10);  comple.SetNpx(1000)
       comple.SetParameters(np.fromiter(P, np.float))
       if self.Radius: comple.FixParameter(1, self.Bo)
-      comple.FixParameter(7, self.RR);  comple.FixParameter(8, self.RL)
+      if self.EdgeP2: comple.SetParLimits(4, 0.0, 0.01)
+      else:           comple.FixParameter(4, 0.0)
+      comple.FixParameter(7, self.RR)
+      comple.FixParameter(8, self.RL)
       comple.SetParLimits(9,0.1,100.0)
       R = H.Fit('comple','RSQN')
       if self.Radius: comple.ReleaseParameter(1)
+      if not self.EdgeP2: comple.ReleaseParameter(4)
       comple.ReleaseParameter(7);       comple.ReleaseParameter(8)
       q.put([R.Status(), R.Chi2(), R.Ndf(), R.Prob(), fitParameters(comple)])
 
@@ -201,7 +209,7 @@ class EDGE(Constants):
     p.join()
 
     if not status:
-#      tilt     = (1e+3*pV[3], 1e+3*pE[3], 1e+6*pV[4], 1e+6*pE[4])
+      tilt     = (1e+3*pV[3], 1e+3*pE[3], 1e+6*pV[4], 1e+6*pE[4])
       k        =  4e+6*pV[0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
       deriv    = (1.+k)**2/k/(2.+k) # dE/dWmax, apply scale correcion to the beam energy:
       BE, dBE  = pV[0]-1e-3*self.SC*deriv,  (pE[0]**2 + (1e-3*deriv*self.dSC)**2)**0.5 # Beam Energy [MeV]
@@ -213,9 +221,9 @@ class EDGE(Constants):
       print ' ╟───────────────────────────────┴────────┬─────────────┴─────────────────────────╢'
       print ' ║ Beam energy: %8.3f ± %5.3f [MeV]    │ Bending field: %6.4f ± %6.4f [T]    ║' % (BE, dBE, BF, dBF)
       print ' ║ σ from beam: %8.3f ± %5.3f [keV]    │ Beam spread:   %6.0f ± %6.0f [keV]  ║' % (pV[9], pE[9], BS, dBS)
-#      print ' ║ Edge tilt pol1: %5.3f ± %5.3f [1/eV]   │ Edge tilt pol2: %5.2f ± %5.2f [1/eV^2]║' % tilt
+      print ' ║ Edge tilt pol1: %5.1f ± %5.1f [1/eV]   │ Edge tilt pol2: %5.0f ± %5.0f [1/eV^2]║' % tilt
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
-      print ' ║         χ2/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (chi2, ndf, prob)
+      print ' ║         χ²/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (chi2, ndf, prob)
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
       OK = (pE[0]/pV[0]<0.001) and prob>0.01
       self.Legend.AddEntry(self.comple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (chi2, ndf, prob))
@@ -227,7 +235,7 @@ class EDGE(Constants):
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
 
     if OK: return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}
-    else:  print 'Complex fit: bad fit, bad amplitude, spread or χ2', status;  return False
+    else:  print 'Complex fit: bad fit, bad amplitude, spread or χ²', status;  return False
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -248,9 +256,9 @@ class EDGE(Constants):
     self.dW            =                Scale['dW'][c] # linear calibration statistical error, keV
     self.SC, self.dSC  = Scale['C'][c], Scale['dC'][c] # PB-5  scale correction and its error, keV
     self.RR, self.dRR  = Scale['R'][c], Scale['dR'][c] # Right resolution sigma and its error, keV
-    self.RL, self.dRL  = Scale['L'][c], Scale['dL'][c] # Left  resolution sigma and its error, keV
+    if self.Asymme:    self.RL, self.dRL  = Scale['L'][c], Scale['dL'][c] # Left  resolution sigma and its error, keV
+    else:              self.RL, self.dRL  = Scale['R'][c], Scale['dR'][c] # Left  resolution sigma and its error, keV
     self.EP            = Scale['X'][c]                 # exclude peaks, keV
-#    print Scale['N'][c]
     print ' ╔ HPGe calibration: %15s ══════════════════╤══════════════════════════╗' % (self.HPGe.outfile.split('/')[-1])
     print ' ║  W_max  = %9.3f keV  │ σR = %6.3f ± %5.3f keV  │ σL = %6.3f ± %5.3f keV  ║' % (wmax, self.RR, self.dRR, self.RL, self.dRL)
     print ' ╚══════════════════════════╧══════════════════════════╧══════════════════════════╝\n'
@@ -330,15 +338,16 @@ class EdgeSimple(Constants): # Ai integral (classical formula) and Klein-Nishina
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with normal Gaussian from beam spread
+  No = 1./ROOT.TMath.Sqrt(ROOT.TMath.Pi())
 # p[0] - HPGe sigma_R [keV] | p[1] - HPGe sigma_L [keV]  | p[2] Beam spread smearing [keV]
   def __call__(self, x, p):
     SR = 0.5/(p[0]*p[0] + p[2]*p[2]); RR = ROOT.TMath.Sqrt(SR)
     SL = 0.5/(p[1]*p[1] + p[2]*p[2]); RL = ROOT.TMath.Sqrt(SL)
     R = ROOT.TMath.Exp(-x[0]*x[0]*SR) * ROOT.TMath.Erfc(-x[0] * RR * p[0]/p[2]) * RR / (1. + p[1]/p[0])
     L = ROOT.TMath.Exp(-x[0]*x[0]*SL) * ROOT.TMath.Erfc( x[0] * RL * p[1]/p[2]) * RL / (1. + p[0]/p[1])
-    return (L + R) / ROOT.TMath.Sqrt(ROOT.TMath.Pi())
+    return self.No * (L + R)
 """
-# ЭТО НЕВЕСТЬ ОТКУДА ПОЛУЧЕННАЯ НЕПРАВИЛЬНАЯ СВЕРТКА!!!
+# ЭТО НЕВЕСТЬ КАК ПОЛУЧЕННАЯ НЕПРАВИЛЬНАЯ СВЕРТКА!!! (СОХРАНЕНО ДЛЯ ИСТОРИИ)
 class HPGeSpread: # Analitical convolution of the HPGe bifurcated Gaussian with normal Gaussian from beam spread
 # p[0] - HPGe sigma_R [keV] | p[1] - HPGe sigma_L [keV]  | p[2] Beam spread smearing [keV]
   C = 1./ROOT.TMath.Sqrt(2*ROOT.TMath.Pi())
@@ -367,7 +376,9 @@ class EMSResults:
     self.datfile = folder + cfg.get('scan', 'file') +'.txt'
     self.espread = folder + 'SvsI.pdf'
     self.SI.SetTitle(folder)
-    with open(self.datfile,'a') as f:  f.write(self.headline)
+    with open(self.datfile,'a') as f:
+#      f.write('# R=140cm, assym = false, edgepoly2 = false\n')
+      f.write(self.headline)
 
   def __del__(self):
     if hasattr(self, 'rc'): self.rc.cd(); self.rc.Clear()

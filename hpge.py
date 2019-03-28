@@ -196,7 +196,7 @@ class Histogram:
       while n < self.nfile:
         if SPEC.ReadData(flist[0], self.nbins, self.tmin):
           if n==0: self.UTB = SPEC.utb
-          elif (SPEC.utb - self.UTE) > 1800:  break
+          elif (SPEC.utb - self.UTE) > 3600:  break
 
           self.UTE = SPEC.ute;  self.LiveT += SPEC.tLive;  n += 1;  filechain.append(flist[0])
           for nbin in range(self.nbins): self.hps.SetBinContent(nbin, self.hps.GetBinContent(nbin) + SPEC.DATA[nbin])
@@ -224,6 +224,7 @@ class Histogram:
       self.sname += ' Live-time: %d hours %d min %d s (%d files).' % (H, M, S, n)
       self.hps.SetNameTitle('hps',self.sname);  self.hps.SetEntries(self.hps.Integral());  self.hps.SetLineColor(ROOT.kBlack)
       if self.tokeV:
+        self.CALIBRATION.LiveT = self.LiveT
         R = self.CALIBRATION.Do(self.UTB, self.UTE, SPEC.PB5, self.hps, ptype)
       elif self.EME:
         R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain, SPEC.Grate)
@@ -257,6 +258,7 @@ class DataFile:
         try:                self.HAT[T[0]] = float(T[1])
         except ValueError:  self.HAT[T[0]] = T[1]
 
+#    if len(self.PB5)==0: self.PB5 = [0.4, 0.5, 0.55, 0.6, 0.9, 1.05, 1.5, 1.6, 1.75, 1.83, 2.0, 2.5, 3.0, 3.5, 4.0]
 #    self.PB5 = [0.800, 0.900, 1.100, 1.500, 1.800, 2.000, 2.500, 2.800, 3.200, 3.700, 4.500, 5.200, 5.400, 5.600]
 
     if self.HAT['Tlive']>tmin:

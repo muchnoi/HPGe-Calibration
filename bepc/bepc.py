@@ -2,7 +2,7 @@
 
 import ROOT, cPickle, os, time, ConfigParser
 import numpy as np
-from scale.isotopes import Isotopes
+from scale.scale import Scale
 from hpge import DataFile, Histogram
 ssh = True
 try:
@@ -35,10 +35,10 @@ class EDGE:
     self.comple  = ROOT.TF1('comple', EdgeComple(), 0, 1, 9); self.comple.SetLineColor(ROOT.kAzure)
     self.Lg1     = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC');
     self.Lg2     = ROOT.TLegend(0.55, 0.49, 0.98, 0.69, '', 'brNDC');
-    self.HPGe    = Isotopes(scalefile, cfg_file, 'application')
+    self.HPGe    = Scale(scalefile, cfg_file, 'application')
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Go(self, UTB, UTE, hps, filechain):
+  def Go(self, UTB, UTE, hps, filechain, grating):
     if   filechain == [e for e in filechain if 'elec' in e]: self.lepton = 'electron'
     elif filechain == [e for e in filechain if 'posi' in e]: self.lepton = 'positron'
     else: print 'Not a valid measurement: mixed spectrum'; return False
@@ -90,7 +90,7 @@ class EDGE:
 #      print ' ║ Edge σW, keV:    %10.3f ± %10.3f │ Edge tilt pol1:   %10.7f ± %10.8f ║' % (E['p2'], E['dp2'], E['p5'], E['dp5'])
 #      print ' ║ Edge tilt pol2:  %10.8f ± %10.8f │ Background:       %10.3f ± %10.3f ║' % (E['p4'], E['dp4'], E['p5'], E['dp5'])
       print ' ╟─────────────────────────────────────┼──────────────────────────────────────────╢'
-      print ' ║         χ2/NDF = %5.1f/%3d          │        Probability: %5.3f                ║' % (E['Chi2'], E['NDF'],Prob)
+      print ' ║         χ²/NDF = %5.1f/%3d          │        Probability: %5.3f                ║' % (E['Chi2'], E['NDF'],Prob)
       print ' ╚═════════════════════════════════════╧══════════════════════════════════════════╝\n'
       OK = (E['p0']>self.MinAmp) and (E['dp0']/E['p0']<1.0) and (E['Chi2']/E['NDF']<10.0) and (E['p2']<100.0)
       self.Lg1.Clear(); self.Lg1.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (E['Chi2'], E['NDF'], Prob))
@@ -101,7 +101,7 @@ class EDGE:
     self.Lg1.Draw('SAME'); self.cc.Modified(); self.cc.Update()
     if OK: return E
 #    raw_input('Bad Fit?')
-    print 'Simple fit: bad fit, bad amplitude, spread or χ2';
+    print 'Simple fit: bad fit, bad amplitude, spread or χ²';
     return False
 
 
@@ -131,7 +131,7 @@ class EDGE:
     print ' ║ Edge σW, keV:     %6.3f ± %5.3f     │ Background:       %8.1f ± %7.1f    ║' % (Ec['p2'], Ec['dp2'], Ec['p5'], Ec['dp5'])
     print ' ║ HPGe σR, keV:     %6.3f ± %5.3f     │ HPGe σL, keV:  %10.3f ± %10.3f  ║' % (Ec['p7'], Ec['dp7'], Ec['p8'], Ec['dp8'])
     print ' ╟──────────────────────────────────────┼─────────────────────────────────────────╢'
-    print ' ║         χ2/NDF = %5.1f/%3d           │          Probability: %5.3f             ║' % (Ec['Chi2'], Ec['NDF'], Prob)
+    print ' ║         χ²/NDF = %5.1f/%3d           │          Probability: %5.3f             ║' % (Ec['Chi2'], Ec['NDF'], Prob)
     print ' ╚══════════════════════════════════════╧═════════════════════════════════════════╝\n'
 
     self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (Ec['Chi2'], Ec['NDF'], Prob))
@@ -153,7 +153,7 @@ class EDGE:
     self.Wmax, self.dWmax = Wmax, dWmax
     self.BsCt, self.dBsCt = Ec['p2'], Ec['dp2']
     BAD = Ec['p0']<self.MinAmp or Ec['dp0']/Ec['p0']>1.0 or Ec['Chi2']/Ec['NDF']>10.0
-    if BAD:  print 'Complex fit: bad amplitude, spread or χ2';  return False
+    if BAD:  print 'Complex fit: bad amplitude, spread or χ²';  return False
     return Ec
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

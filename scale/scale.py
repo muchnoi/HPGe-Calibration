@@ -411,7 +411,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 
     S = 'pulser'
     if cfg.has_section(S):
-      self.zero_p = cfg.getfloat(S, 'zero_p'); self.gain_p = cfg.getfloat(S, 'gain_p'); self.peer_p = cfg.getfloat(S, 'peer_p')
+      self.zero_p = cfg.getfloat(S, 'zero_p'); self.gain_p = cfg.getfloat(S, 'gain_p')
     else:
       print 'Can not read configuration for pulser!'
 

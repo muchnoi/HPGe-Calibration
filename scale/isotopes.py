@@ -254,7 +254,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
     for pk in self.ScalePeaks:
       n = self.ScalePeaks.index(pk)
       self.S0.SetPoint(     n, pk[ 'E'],  pk[K]['p1'] - pk['E'])
-      self.S0.SetPointError(n, pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2 + self.tbpa**2)**0.5)
+      self.S0.SetPointError(n, pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2)**0.5)
     self.S0.Fit('lisc','QRN')
     k0,  k1 = self.lisc.GetParameter(0), self.lisc.GetParameter(1)
     self.zero = (self.zero-k0)/(1.+k1);     self.gain /= (1.+k1)
@@ -401,7 +401,7 @@ class Isotopes(Atlas): # class # class # class # class # class # class # class #
       self.zero = cfg.getfloat(S, 'zero');    self.gain = cfg.getfloat(S, 'gain')
       self.emin = cfg.getfloat(S, 'emin');    self.emax = cfg.getfloat(S, 'emax')
       self.fitL = cfg.getfloat(S, 'fitL');    self.fitR = cfg.getfloat(S, 'fitR')
-      self.erec = cfg.getfloat(S, 'erec');    self.tbpa = cfg.getfloat(S, 'tbpa')
+      self.erec = cfg.getfloat(S, 'erec');    #self.tbpa = cfg.getfloat(S, 'tbpa')
       self.nitr = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
       if cfg.has_option(S, 'thre'):           self.rep3 = cfg.getfloat(S, 'thre')
       else:                                   self.rep3 = 0.0

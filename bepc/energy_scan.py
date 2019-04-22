@@ -82,16 +82,20 @@ class Energy_Scan:
         flist = [el for el in Energy_Points[PointN] if 'elec' in el]; self.H.nfile = len(flist); E = self.H.Go(flist)
         flist = [el for el in Energy_Points[PointN] if 'posi' in el]; self.H.nfile = len(flist); P = self.H.Go(flist)
         if E and P:
-          Bs_elec.append(E[4]);   Bs_posi.append(P[4])
-          tmin, tmax = min(E[0] - E[1], P[0] - P[1]), max(E[0] + E[1], P[0] + P[1])
-          t   , dt      = 0.5*(tmin + tmax), 0.5*(tmax - tmin)
-          E_cms, dE_cms = self.IP * (E[2]*P[2])**0.5, (E[3]**2 + P[3]**2)**0.5
-          S_cms  = (E[4]**2+P[4]**2)**0.5;
-          dS_cms = ((E[4]*E[5])**2 + (P[4]*P[5])**2)**0.5/S_cms
-          S_cms  = 0.001*S_cms
-          dS_cms = 0.001*dS_cms
-
-          outs = '%10d  %5d  %8.3f  %5.3f  %6.3f  %5.3f # point %2d (%s)\n' % (t, dt, E_cms, dE_cms, S_cms, dS_cms, PointN, Points_Names[PointN])
+          Bs_elec.append(E['S']);   Bs_posi.append(P['S'])
+          tmin, tmax = min(E['t'] - E['dt'], P['t'] - P['dt']), max(E['t'] + E['dt'], P['t'] + P['dt'])
+          t   , dt   = 0.5*(tmin + tmax), 0.5*(tmax - tmin)
+          Ecm   = self.IP *(E['E'] * P['E'])**0.5
+          dE1  = (E['dE1']**2 + P['dE1']**2)**0.5
+          dE2  = (E['dE2']**2 + P['dE2']**2)**0.5
+          dE3  = (E['dE3']**2 + P['dE3']**2)**0.5
+          Scm  = (  E['S']**2 +   P['S']**2)**0.5;
+          dScm = ((E['S']*E['dS'])**2 + (P['S']*P['dS'])**2)**0.5/Scm
+          Scm  = 0.001*Scm
+          dScm = 0.001*dScm
+          SRC  = E['SRC']+P['SRC']
+          outs = (t, dt, Ecm, SRC, dE1, dE2, dE3, Scm, dScm, PointN, Points_Names[PointN])
+          outs = '%10d  %5d  %8.3f  %5.3f  %5.3f  %5.3f  %5.3f  %6.3f  %5.3f # point %2d (%s)\n' % outs
           with open('SCAN.results','a') as f: f.write(outs)
 #        raw_input('Point %d energy measurement is ready' % PointN)
       else:

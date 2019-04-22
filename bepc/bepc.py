@@ -27,7 +27,7 @@ class EDGE:
     self.Merger  =                 cfg.getint('edge', 'BinsMerger')
     self.ETuner  =               cfg.getfloat('edge', 'EbepcTuner')
     self.Asymme  =               cfg.getfloat('edge', 'Asymmetry')
-    self.SaveDB  =         ssh and cfg.getint('edge', 'SaveForDB')
+    self.SaveDB  =     ssh and cfg.getboolean('edge', 'SaveForDB')
 
     self.cc      = ROOT.TCanvas('cc','BEMS for BEPC-II', 800, 600, 800, 600); # self.cc.Divide(1,2)
     self.const   = ROOT.TF1('const', '[0]')
@@ -59,11 +59,12 @@ class EDGE:
         if Edge:
          Edge = self.fitEdgeComplex(Edge, self.Ranger)
          if Edge:
-           R = self.Beam_Energy(UTB,UTE)
-           if R and self.SaveDB:
-             self.Save_Files(R)
-#             self.Save_DB(R)
-#             self.Save_WWW()
+           R = self.Beam_Energy(UTB, UTE, Edge)
+           if R:
+             self.Save_Files((R['t'], R['dt'], R['E'], R['dE'], R['S'], R['dS']))
+             if self.SaveDB:
+               self.Save_DB((R['t'], R['dt'], R['Eo'], R['dE1'], R['BS'], R['dBS']))
+               self.Save_WWW()
            return R
     else: return False
 
@@ -140,46 +141,56 @@ class EDGE:
     self.Lg2.AddEntry(self.comple, '#sigma_{beam} = %7.2f #pm %4.2f keV' % (Ec['p2'], Ec['dp2']), 'l')
     self.comple.DrawCopy('SAME'); self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
 
-    print ' Wmax: %7.2f ± %4.2f keV (symmetric fit)'      % (E['p1'], E['dp1'])
-    Wmax, dWmax = Ec['p1'],  Ec['dp1']
-    print ' Wmax: %7.2f ± %4.2f keV (asymmetric fit)'     % (Wmax, dWmax)
-    Wmax, dWmax = Wmax-self.SC, (dWmax**2+self.dSC**2)**0.5;
-    print ' Wmax: %7.2f ± %4.2f keV (spline correction )' % (Wmax, dWmax)
+#    print ' Wmax: %7.2f ± %4.2f keV (symmetric fit)'      % (E['p1'], E['dp1'])
+#    Wmax, dWmax = Ec['p1'],  Ec['dp1']
+#    print ' Wmax: %7.2f ± %4.2f keV (asymmetric fit)'     % (Wmax, dWmax)
+#    Wmax, dWmax = Wmax-self.SC, (dWmax**2+self.dSC**2)**0.5;
+#    print ' Wmax: %7.2f ± %4.2f keV (spline correction )' % (Wmax, dWmax)
 
 #    outs = '%10d  %5d  %4d  %4d   %4d  %4d # point %2d (%s)\n' % (t, dt, int(E[4]), int(E[5]), int(P[4]), int(P[5]), PointN, Points_Names[PointN])
 #    outs = '%6.3f  %5.3f  %7.5f  %7.5f  %9.7f  %9.7f\n' % (Ec['p2'], Ec['dp2'], Ec['p3'], Ec['dp3'], Ec['p4'], Ec['dp4'])
 #    with open('%8s.dat' % self.lepton,'a') as f: f.write(outs)
 
-    self.Wmax, self.dWmax = Wmax, dWmax
-    self.BsCt, self.dBsCt = Ec['p2'], Ec['dp2']
+#    self.Wmax, self.dWmax = Wmax, dWmax
+#    self.BsCt, self.dBsCt = Ec['p2'], Ec['dp2']
     BAD = Ec['p0']<self.MinAmp or Ec['dp0']/Ec['p0']>1.0 or Ec['Chi2']/Ec['NDF']>10.0
     if BAD:  print 'Complex fit: bad amplitude, spread or χ²';  return False
     return Ec
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Beam_Energy(self,utb,ute):
-    def Eo(wmax): return 0.5 * wmax * (1.0 + (1.0 + self.me**2/wmax/self.wo)**0.5)
-    EB  = Eo(self.Wmax);                     dEB = 0.5 * self.dWmax / self.Wmax * EB
-    BS  = 0.5 * self.BsCt / self.Wmax * EB;  dBS = 0.5 * self.dBsCt / self.Wmax * EB
-    EB  = 0.001*EB; dEB  = 0.001*dEB
-    SR  = 4.75e-3*(EB*0.001)**4 # Energy Correction due to SR losses
-    EB += SR
-    st  = 'Measurement time '
-    st += time.strftime('from %Y.%m.%d %H:%M:%S', time.localtime(utb))
-    st += time.strftime(' to %Y.%m.%d %H:%M:%S.', time.localtime(ute))
-    print '\n ╔ %8s Beam Energy Determination:  ══════════════════════════════════════════╗'      % self.lepton
-    print ' ║      BEPC beam energy = %8.3f ± %5.3f MeV was taken from database           ║'      % (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'])
-    print ' ║    %67s         ║' % (st)
-    print ' ║                                                                                ║'
-    print ' ║ BEMS beam energy = %8.3f ± %5.3f MeV  (SR correction +%5.3f MeV was added)  ║'      % (EB, dEB, SR)
-    print ' ║ BEMS beam spread =     %4.0f ±  %4.0f keV                                        ║' % (BS, dBS)
-    print ' ╚════════════════════════════════════════════════════════════════════════════════╝\n'
-    self.Lg2.AddEntry(self.comple, 'E_{beam} = %8.2f #pm %5.2f MeV' % (EB, dEB), 'l')
-    self.Lg2.AddEntry(self.comple, '#sigma_{E} = %4.0f #pm %4.0f keV' % (BS, dBS), 'l')
-    self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
+  def Beam_Energy(self, utb, ute, edge):
+    R = {}
+    def ToE(W, dW, SW, dSW):
+      E = 0.5 * W * (1.0 + (1.0 + self.me**2/W/self.wo)**0.5)
+      x = 4.0 * self.wo * E /self.me**2
+      D = (1.0 + x)**2 / ((2.0 + x) * x)
+      R['SRC'] = 4.75e-3*(1e-6*E)**4 # Energy Correction due to SR losses [MeV]
+      R['E'  ] = 1e-3*E + R['SRC']
+      R['dE1'] = 1e-3*D*dW[0] # keV -> MeV
+      R['dE2'] = 1e-3*D*dW[1] # keV -> MeV
+      R['dE3'] = 1e-3*D*dW[2] # keV -> MeV
+      R['S'  ] = D*SW
+      R['dS' ] = D*dSW
+      return R
 
-    t, dt = 0.5*(utb + ute), 0.5*(ute - utb)
-    return (t, dt, EB, dEB, BS, dBS)
+    R   = ToE(edge['p1']-self.SC, [edge['dp1'], self.dW, self.dSC], edge['p2'], edge['dp2'])
+    st  = 'Measurement time '
+    st += time.strftime('from %Y.%m.%d/%H:%M:%S', time.localtime(utb))
+    st += time.strftime(' to %Y.%m.%d/%H:%M:%S', time.localtime(ute))
+    print '\n ╔ %8s Beam Energy Determination:  ══════════════════════════════════════════╗' % self.lepton
+    print ' ║      BEPC beam energy = %8.3f ± %5.3f MeV was taken from database           ║' % (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'])
+    print ' ║    %66s          ║' % (st)
+    print ' ║                                                                                ║'
+    print ' ║      BEMS beam energy = %8.3f ± %5.3f ± %5.3f ± %5.3f MeV                   ║'      % (R['E'], R['dE1'], R['dE2'], R['dE3'])
+    print ' ║ Correction +%5.3f MeV for half-a-ring synchrotron radiation losses was added   ║'   %  R['SRC']
+    print ' ║      BEMS beam energy spread = %4.0f ± %4.0f keV                                 ║' % (R['S'], R['dS'])
+    print ' ╚════════════════════════════════════════════════════════════════════════════════╝\n'
+    R['t'], R['dt'] = 0.5*(utb + ute), 0.5*(ute - utb)
+    R['dE'] = (R['dE1']**2 + R['dE2']**2 + R['dE3']**2)**0.5
+    self.Lg2.AddEntry(self.comple, 'E_{beam} = %8.2f #pm %5.2f MeV'   % (R['E'], R['dE']), 'l')
+    self.Lg2.AddEntry(self.comple, '#sigma_{E} = %4.0f #pm %4.0f keV' % (R['S'], R['dS']), 'l')
+    self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
+    return R
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

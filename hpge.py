@@ -111,9 +111,11 @@ class ToDo:
       elif opt in ("-p", "--point")      : self.point     = arg;      self.online = False
     cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file') and not S: self.scalefile = self.point + cfg.get('scale', 'file')
+    if cfg.has_option('scale', 'tgap'):           self.tgap      =           cfg.getint('scale', 'tgap')
     if not self.online:
-      if cfg.has_option('scan', 'bdate') and not D:  self.folder = cfg.get('scan', 'bdate')
-      if cfg.has_option('scan', 'edate') and not E: self.efolder = cfg.get('scan', 'edate')
+      if cfg.has_option('scan', 'bdate') and not D:  self.folder = cfg.get(   'scan', 'bdate')
+      if cfg.has_option('scan', 'edate') and not E: self.efolder = cfg.get(   'scan', 'edate')
+      if cfg.has_option('scan', 'tgap'):           self.tgap     = cfg.getint('scan', 'tgap')
 
   def GetList(self):
     if self.point != './':
@@ -166,7 +168,7 @@ class Histogram:
 
 
   def __init__(self, todo):
-    self.nfile, self.prompt, self.tokeV, self.folder = todo.nfile, todo.prompt, todo.tokeV, todo.point
+    self.nfile, self.prompt, self.tokeV, self.folder, self.tgap = todo.nfile, todo.prompt, todo.tokeV, todo.point, todo.tgap
     cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
     if cfg.has_option('scale', 'cdif'):  self.cdif = cfg.getfloat('scale', 'cdif')
     else:                                self.cdif = 0.01
@@ -196,7 +198,7 @@ class Histogram:
       while n < self.nfile:
         if SPEC.ReadData(flist[0], self.nbins, self.tmin):
           if n==0: self.UTB = SPEC.utb
-          elif (SPEC.utb - self.UTE) > 3600:  break
+          elif (SPEC.utb - self.UTE) > self.tgap:  break
 
           self.UTE = SPEC.ute;  self.LiveT += SPEC.tLive;  n += 1;  filechain.append(flist[0])
           for nbin in range(self.nbins): self.hps.SetBinContent(nbin, self.hps.GetBinContent(nbin) + SPEC.DATA[nbin])

@@ -82,6 +82,8 @@ class EDGE(Constants):
         return False
 
     R = VEPP2K_DB().GetRunInfo(filechain)
+#    if not R:
+#      R =  {'E':535.2, 'dE':0.1, 'I':0.0, 'dI':0.0, 'B':0.0, 'dB':0.0}
     if R:
       print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗'
       print ' ║  E = %7.2f ± %5.2f MeV │ Ie = %5.1f ± %5.1f mA   │  Bo = %7.5f ± %7.5f T ║' % (R['E'], R['dE'], R['I'], R['dI'], R['B'], R['dB'])
@@ -104,9 +106,9 @@ class EDGE(Constants):
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
       # get rid of spikes:
-      self.EP.append(583 ); self.EP.append(596 )
-      self.EP.append(511 ); self.EP.append(564 ); self.EP.append(727 );
-      #self.EP.append(860 ); self.EP.append(1294); self.EP.append(1461); self.EP.append(2103)
+      self.EP.append(565)
+#      self.EP.append(820)
+#      self.EP.append(852)
       for spike in self.EP:
         lo = 1 + int((spike - zero - 4 * self.RL)/(gain*float(self.Merger)))
         hi = 1 + int((spike - zero + 5 * self.RR)/(gain*float(self.Merger)))
@@ -138,6 +140,7 @@ class EDGE(Constants):
     # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |
     params = np.fromiter([self.Eo,  self.Bo, A, 0.0, 0.0, B, 0.0], np.float)
     self.simple.SetParameters(params); self.simple.SetRange(E1, E2); self.simple.SetNpx(1000)
+    self.simple.SetParLimits(2, 0.0, 1.e+6)
     if self.Radius: self.simple.FixParameter(1, self.Bo)
     if self.EdgeP2: self.simple.SetParLimits(4, 0.0, 0.01)
     else:           self.simple.FixParameter(4, 0.0)

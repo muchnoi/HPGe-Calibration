@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-#import paramiko
 
 import ROOT, ConfigParser
 import numpy as np
@@ -35,15 +34,17 @@ class Energy_Scan:
     self.cfh = ROOT.TCanvas('cfh','Files history', 2, 2, 1002, 1002);  self.cfh.Divide(1,2)
     self.Show_Points(TABLE);   raw_input('All good points...')
 
-    n, PointN = 0, 0
+    n, m, PointN = 0, 0, 0
     Points_Names, Energy_Points = [], [ [ TABLE['file'][n] ] ]
     Points_Names.append('%.3f MeV' % TABLE['E'][n])
     while n < ngood-1:
       Condition1 = abs(TABLE['E'][n] - TABLE['E'][n+1]) < (TABLE['dE'][n] + TABLE['dE'][n+1])
-      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 4000 # separate points with "large" time gaps
-      if Condition1 and Condition2:
+      Condition2 = abs(TABLE['t'][n+1] - TABLE['t'][n]) < 5400 # separate points with "large" time gaps
+      Condition3 = True #abs(TABLE['t'][n+1] - TABLE['t'][m]) < 12*3600 # do not allow "too long" points
+      if Condition1 and Condition2 and Condition3:
         Energy_Points[PointN].append(TABLE['file'][n+1])
       else:
+        m = n
         Energy_Points.append([TABLE['file'][n+1]]); PointN += 1
         Points_Names.append('%.3f MeV' % TABLE['E'][n+1])
       n += 1
@@ -68,11 +69,34 @@ class Energy_Scan:
 
     self.Show_Points(TABLE)
 
+    nf = 0
     print 'After selection:'
     for PointN in range(len(Energy_Points)):
       print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
-
+      nf += len(Energy_Points[PointN])  
+    print 'total number of files: %d' % nf
     raw_input( '%d energy scan points have been founded' % PointN )
+
+    np = 0 # split long points
+    while np < len(Energy_Points):
+      n_files = len(Energy_Points[np])
+      if n_files > 30:
+        A = Energy_Points[np][0:n_files/2]
+        B = Energy_Points[np][n_files/2:]
+        Energy_Points[np] = B
+        Energy_Points.insert(np, A)
+        Points_Names.insert(np, Points_Names[np])
+        np += 2
+      else: 
+        np += 1
+
+    nf = 0
+    print 'After selection & splitting:'
+    for PointN in range(len(Energy_Points)):
+      print 'Point %2d energy: %s. Number of files: %d' % (PointN, Points_Names[PointN], len(Energy_Points[PointN]))
+      nf += len(Energy_Points[PointN])  
+    print 'total number of files: %d' % nf
+    raw_input( '%d energy scan points have formed' % PointN )
 
     self.H = Histogram(todo)
     Bs_elec, Bs_posi = [], []
@@ -89,7 +113,7 @@ class Energy_Scan:
           dE1  = (E['dE1']**2 + P['dE1']**2)**0.5
           dE2  = (E['dE2']**2 + P['dE2']**2)**0.5
           dE3  = (E['dE3']**2 + P['dE3']**2)**0.5
-          Scm  = (  E['S']**2 +   P['S']**2)**0.5;
+          Scm  = (  E['S']**2 +   P['S']**2)**0.5
           dScm = ((E['S']*E['dS'])**2 + (P['S']*P['dS'])**2)**0.5/Scm
           Scm  = 0.001*Scm
           dScm = 0.001*dScm
@@ -127,25 +151,34 @@ class Energy_Scan:
     Ee, dEe = np.fromiter(TE['E'], np.float), np.fromiter(TE['dE'], np.float)
     Tp, dTp = np.fromiter(TP['t'], np.float), np.fromiter(TP['dt'], np.float)
     Ep, dEp = np.fromiter(TP['E'], np.float), np.fromiter(TP['dE'], np.float)
-    GEE = ROOT.TGraphErrors(len(Te),Te,Ee,dTe,dEe); GEE.SetMarkerColor(ROOT.kBlack); GEE.SetLineColor(ROOT.kBlack); GEE.SetMarkerStyle(20)
-    GEP = ROOT.TGraphErrors(len(Tp),Tp,Ep,dTp,dEp); GEP.SetMarkerColor(ROOT.kRed);   GEP.SetLineColor(ROOT.kRed);   GEP.SetMarkerStyle(20)
+    GEE = ROOT.TGraphErrors(len(Te),Te,Ee,dTe,dEe)
+    GEP = ROOT.TGraphErrors(len(Tp),Tp,Ep,dTp,dEp)
+    GEE.SetMarkerColor(ROOT.kBlack); GEE.SetLineColor(ROOT.kBlack); GEE.SetMarkerStyle(22); GEE.SetMarkerSize(1.5)
+    GEP.SetMarkerColor(ROOT.kRed);   GEP.SetLineColor(ROOT.kRed);   GEP.SetMarkerStyle(23); GEP.SetMarkerSize(1.5)
     GEE.GetXaxis().SetTimeDisplay(1);  GEE.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
     GEE.GetXaxis().SetLabelSize(0.02); GEE.GetXaxis().SetTitle('China time');        GEE.GetXaxis().SetLabelOffset(0.02)
-    GEE.SetTitle('Mean BEPC Energy [MeV]')
+    GEE.GetYaxis().SetTitle('Mean BEPC beam energy [MeV]')
     self.GEE = GEE
     self.GEP = GEP
 
+    self.Lg    = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC');
+    self.Lg.Clear();
+    self.Lg.SetHeader('BEMS is operating with')
+    self.Lg.AddEntry(self.GEE, 'electron beam', 'lp')
+    self.Lg.AddEntry(self.GEP, 'positron beam', 'lp')
+
+
     T,  dT = np.fromiter(TABLE['t'],  np.float), np.fromiter(TABLE['dt'], np.float)
     Se, Sp = np.fromiter(TABLE['Se'], np.float), np.fromiter(TABLE['Sp'], np.float)
-    GSE = ROOT.TGraph(len(T),T,Se); GSE.SetMarkerColor(ROOT.kBlack); GSE.SetLineColor(ROOT.kBlack); GSE.SetMarkerStyle(20)
-    GSP = ROOT.TGraph(len(T),T,Sp); GSP.SetMarkerColor(ROOT.kRed);   GSP.SetLineColor(ROOT.kRed);   GSP.SetMarkerStyle(20)
+    GSE = ROOT.TGraph(len(T),T,Se); GSE.SetMarkerColor(ROOT.kBlack); GSE.SetLineColor(ROOT.kBlack); GSE.SetMarkerStyle(22)
+    GSP = ROOT.TGraph(len(T),T,Sp); GSP.SetMarkerColor(ROOT.kRed);   GSP.SetLineColor(ROOT.kRed);   GSP.SetMarkerStyle(23)
     GSE.GetXaxis().SetTimeDisplay(1);  GSE.GetXaxis().SetTimeFormat('#splitline{%b%d}{%H:%M}%F1970-01-01 00:00:00')
     GSE.GetXaxis().SetLabelSize(0.02); GSE.GetXaxis().SetTitle('China time'); GSE.GetXaxis().SetLabelOffset(0.02)
     GSE.SetTitle('R.m.s. BEPC Energy [MeV]')
     self.GSE = GSE
     self.GSP = GSP
 
-    self.cfh.cd(1); self.cfh.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME');
+    self.cfh.cd(1); self.cfh.SetGrid(); self.GEE.Draw('AP'); self.GEP.Draw('PSAME'); self.Lg.Draw('SAME')
     self.cfh.cd(2); self.cfh.SetGrid(); self.GSE.Draw('APL'); self.GSP.Draw('PLSAME');
 
     self.cfh.Modified(); self.cfh.Update()

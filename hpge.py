@@ -4,9 +4,9 @@ import os, sys, getopt, time, string, gzip, ConfigParser
 
 def Usage():
   print '''
- ╔ Python script to process HPGe spectra. © 2005-2018 Nickolai Muchnoi ═══════════╗
+ ╔ Python script to process HPGe spectra. © 2005-2019 Nickolai Muchnoi ═══════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update: December 4, 2018  │ ║
+ ║ Usage: %0000000012s [options]               │ Last update: June 8, 2019      │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -23,6 +23,7 @@ def Usage():
  ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
  ║                                     otherwise "escale.root" is used.           ║
+ ║ -j,          --joint              : show joint calibration results.            ║
  ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
  ║              --edge               : try to measure beam energy by Compton edge.║
  ║              --escan              : deal with beam energy scan experiment.     ║
@@ -78,16 +79,16 @@ class ToDo:
     self.filename  = self.lastfile = ''
     self.tokeV     = self.online   = True
     self.point     = './'
-    self.prompt    = self.listonly = self.edge = self.escan = self.verify = self.generate = False
+    self.prompt    = self.listonly = self.edge = self.escan = self.verify = self.generate = self.examine = False
     self.cfg_file  = 'online.cfg'
     self.scalefile = 'escale.root'
     self.Options(sys.argv)
 
   def Options(self,argv):
     S = D = E = False
-    sopt = "c:d:e:f:n:p:s:t:v:ghikl"
+    sopt = "c:d:e:f:n:p:s:t:v:ghijkl"
     lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=",
-            "generate", "interactive", "help", "keV", "list", "edge", "escan"]
+            "generate", "interactive", "joint", "help", "keV", "list", "edge", "escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
@@ -102,6 +103,7 @@ class ToDo:
       elif opt in ("-t", "--time")       : self.tfrom     = int(arg); self.online = False
       elif opt in ("-k", "--keV")        : self.tokeV     = False
       elif opt in ("-s", "--scale")      : self.scalefile = arg;                           S = True
+      elif opt in ("-j", "--joint")      : self.examine   = True;     self.online = False
       elif opt in ("-v", "--verify")     : self.verify    = True;     self.online = False; self.energy = float(arg)
       elif opt in ("-l", "--list")       : self.listonly  = True;
       elif opt in (      "--edge")       : self.edge      = True;                          self.tokeV  = False
@@ -199,6 +201,7 @@ class Histogram:
         if SPEC.ReadData(flist[0], self.nbins, self.tmin):
           if n==0: self.UTB = SPEC.utb
           elif (SPEC.utb - self.UTE) > self.tgap:  break
+#          elif self.LiveT > 30000: break
 
           self.UTE = SPEC.ute;  self.LiveT += SPEC.tLive;  n += 1;  filechain.append(flist[0])
           for nbin in range(self.nbins): self.hps.SetBinContent(nbin, self.hps.GetBinContent(nbin) + SPEC.DATA[nbin])
@@ -314,6 +317,10 @@ def main(argv):
       from scale.scale import Scale
       A = Scale(todo.scalefile, todo.cfg_file, 'verification')
       A.Check_Scale(todo.energy, todo.prompt)
+    elif todo.examine:
+      from scale.scale import Scale
+      A = Scale(todo.scalefile, todo.cfg_file, 'verification')
+      A.Check_Resolution_Model()
     else:
       A = Histogram(todo)
       while True:

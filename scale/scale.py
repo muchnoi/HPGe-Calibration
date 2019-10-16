@@ -18,7 +18,6 @@ class BSpline:  # class # class # class # class # class # class # class # class 
     return self.bspline(x[0])
 
 
-
 class Scale(Atlas): # class # class # class # class # class # class # class # class # class # class # class # class # class
   Colors = [ROOT.kRed+2, ROOT.kGreen+3, ROOT.kBlue+2]
   Styles = [20,  22,  24];    Sizes  = [1.25, 1.0, 1.0]
@@ -44,9 +43,9 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 
       self.SP = ROOT.TSpectrum()
       # Peaks Fitting Section
-      self.asps = ROOT.TF1('asps', LineShape(self.expt), 0.0, 1.0, 6);    self.asps.SetLineColor(ROOT.kBlue+2)
-      self.asps.SetParNames('Amp','E_{0}, keV', '#sigma_{R}, keV', '#sigma_{L}, keV', 'Compton', 'Background')
-      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (1.0, 5.0), (0.0,100.0))
+      self.asps = ROOT.TF1('asps', LineShape(), 0.0, 1.0, 7);    self.asps.SetLineColor(ROOT.kBlue+2)
+      self.asps.SetParNames('Amp','E_{0}, keV', '#sigma_{R}, keV', '#sigma_{L}/#sigma_{R}, keV', 'Compton', 'Background', '#kappa')
+      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (1.0, 5.0), (0.0,100.0), (0.0, 1.e+6), (1.0, 10.0) )
     else:
       self.cv   =  ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 502)
       self.PADS = [ROOT.TPad('PAD5', 'Scale',      0.01, 0.01, 0.49, 0.99, 0, 1),
@@ -60,17 +59,20 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.SplineB.SetLineColor(self.Colors[1]); self.SplineB.SetLineWidth(2); self.SplineB.SetNpx(250);
     # Energy Resolution Section
     self.ERG      = ROOT.TMultiGraph(); self.ERG.SetTitle('#sigma_{E} / E [%]')
-    self.eres     = ROOT.TF1('eres', ResolutionModel(), -self.emax, self.emax, 4) # combined resolution model [%]
+    self.eres     = ROOT.TF1('eres', ResolutionModel(), -self.emax, self.emax, 3) # combined resolution model [%]
     self.eres.SetParameters(1.0,  0.24, 0.1e-6, 100.0); self.eres.SetLineColor(self.Colors[0])
-    self.eres.SetParLimits( 0,    0.40, 10.00);         self.eres.SetParLimits(1, 0.05, 0.500)
-    self.eres.SetParLimits( 2,    0.005e-6, 0.15e-6)
+    self.eres.SetParLimits(0, 0.5, 10.0); self.eres.SetParLimits(1, 0.05, 0.5); self.eres.SetParLimits(2, 0.05, 0.5)
+
     self.pulr     = ROOT.TF1('pulr', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
     self.pulr.SetParameters(1.0, 0.0); self.pulr.SetLineColor(self.Colors[1])
     self.InitGraphics()
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def __del__(self):
     Atlas.__del__(self);
-    self.cv.cd(); self.cv.Clear()
+    try: 
+      self.cv.cd(); self.cv.Clear()
+    except AttributeError:
+      pass  
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Do(self, utb, ute, pb5, hps, ptype):
@@ -84,11 +86,10 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if len(self.ScalePeaks)>2:
       for itr in range(1, self.nitr+1):
         self.fitPeaks(L = self.fitL, R = self.fitR)
-        self.Do_Energy_Scale(self.nitr == itr)
-        self.Show_Energy_Scale()
+        self.Show_Energy_Scale(self.Do_Energy_Scale(self.nitr == itr))
         self.hps.SetBins(self.nbins, self.zero, self.zero + self.gain * self.nbins)
       self.ShowScale(1)
-      self.PeaksTable()
+      self.PeaksTable() # there p3 = SL/SR is replaced by p3 = p3*SR = SL
       self.Show_Energy_Resolution(self.Do_Energy_Resolution())
       self.Save_Calibration()
     else:
@@ -127,7 +128,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.ScalePeaks, self.OtherPeaks = [], []
 #    self.PB5 = []
     if self.PB5:
-      self.PulsePeaks = [{'name':'P%02d %5.3f V' % (self.PB5.index(v), v), 'V':v, 'E':self.zero_p + self.gain_p*v, 'dE':0.0} for v in self.PB5]
+      self.PulsePeaks = [{'name':'P%02d %5.3f V' % (self.PB5.index(v), v), 'V':v, 'E':self.zero_p + self.gain_p*v, 'dE':self.eerr_p} for v in self.PB5]
       self.PB5 = True
     else:
       self.PulsePeaks = []
@@ -151,7 +152,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
               break
             else: continue
           if name: break
-      if not name:
+      if not name and A>10.:
         print 'Unknown line: % 8.2f keV (Amp=%4d)' % (x, A)
         if x > 2000.:
           name = "Unknown(%2d)" % unkn
@@ -166,28 +167,35 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if self.PB5:
       self.PulsePeaks = [el for el in self.PulsePeaks if el.has_key('A')]
       self.PulsePeaks.sort(key = lambda p: p['E'])
+    if len(self.PulsePeaks) < 4 : self.PB5=False
+
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitPeaks(self, L = 2.0, R = 2.0):
     for p in self.ScalePeaks + self.PulsePeaks + self.OtherPeaks:
       PB5, ALREADY = p['name'][-1]=='V', p.has_key('shape')
-      if   ALREADY: # if peak was fitted already:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
+      if   ALREADY: # if peak was fitted already:   Amplitude,  Position, Sigma_R, Sigma_L/Sigma_R, Compton, Background, kappa
         V = p['shape']
-        if PB5: p0,p1,p2,p3,p4,p5 = V['p0'], V['p1'], V['p2'], 1.0,     100.000, V['p5']
-        else:   p0,p1,p2,p3,p4,p5 = V['p0'], V['p1'], V['p2'], V['p3'], V['p4'], V['p5']
-      else:   # if a peak was not fitted yet:   Amplitude,  Position, Sigma_R, Sigma_L, Compton, Background
-        p0,p1,p2,p3,p4,p5  = p['A'], p['X'], 1.0, 1.0, 0.00,  p['B']
-      self.asps.SetRange(p1 - L*p2*p3, p1 + R*p2);  self.asps.SetParameters(p0,p1,p2,p3,p4,p5)
-      for np in xrange(5): self.asps.SetParLimits(np, self.p_limits[np][0], self.p_limits[np][1])
+        if PB5: p0,p1,p2,p3,p4,p5,p6 = V['p0'], V['p1'], V['p2'], 1.0,     100.000, V['p5'], 10.0
+        else:   p0,p1,p2,p3,p4,p5,p6 = V['p0'], V['p1'], V['p2'], V['p3'], V['p4'], V['p5'], V['p6']
+      else:   # if a peak was not fitted yet:   Amplitude,  Position, Sigma_R, Sigma_L/Sigma_R, Compton, Background, kappa
+        p0,p1,p2,p3,p4,p5,p6  = p['A'], p['X'], 1.0, 1.0, 0.00,  p['B'], 1.5
+      self.asps.SetParameters(p0,p1,p2,p3,p4,p5,p6)
+      self.asps.SetRange(p1 - L*p2*p3, p1 + R*p2)
+      for np in xrange(7): self.asps.SetParLimits(np, self.p_limits[np][0], self.p_limits[np][1])
       if PB5:
-        self.asps.FixParameter(3,1.0)
-        self.asps.FixParameter(4,100.0)
+        self.asps.FixParameter(3, 1.0)
+        self.asps.FixParameter(4, 100.0)
+      elif self.exp0:
+        self.asps.FixParameter(6, self.kapp.Eval(p1) )
       for attempt in xrange(3):
         Result = self.hps.Fit('asps','RSQN')
         if not Result.Status(): break # print Result.Print()
       if PB5:
         self.asps.ReleaseParameter(3)
         self.asps.ReleaseParameter(4)
+      elif self.exp0:
+        self.asps.ReleaseParameter(6)
       P = fitParameters(self.asps)
       A_OK = abs(P['dp0']/P['p0']) < 0.50
       E_OK = abs(P['dp1']/P['p1']) < 0.005
@@ -218,7 +226,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     name  = '^{%s}%s' % (N,M)
     self.PADS[npad].cd(); self.PADS[npad].Clear(); self.PADS[npad].SetGrid()
     H = self.hps.DrawCopy();  H.GetXaxis().SetRangeUser(L, R)
-    H.SetNameTitle('Spectrum', '%5s (%.3f keV) #chi^{2}/ndf = %.1f/%s' % (name, p['E'], p['shape']['Chi2'], p['shape']['NDF']))
+    H.SetNameTitle('Spectrum', '%5s (%.3f keV) #chi^{2}/ndf = %.1f/%d' % (name, p['E'], p['shape']['Chi2'], p['shape']['NDF']))
     self.asps.DrawCopy('SAME')
     self.cv.Modified(); self.cv.Update()
 #    self.PADS[npad].SaveAs('%.0fkeV.png' % p['E'])
@@ -256,11 +264,11 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.gain =  self.gain     / (1.+k1)
 
 # 2) JUST SHOW OTHER GAMMA LINES
-    self.S2.Set(len(self.OtherPeaks))
-    for pk in self.OtherPeaks:
-      n = self.OtherPeaks.index(pk)
-      self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
-      self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
+#    self.S2.Set(len(self.OtherPeaks))
+#    for pk in self.OtherPeaks:
+#      n = self.OtherPeaks.index(pk)
+#      self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
+#      self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
 
 # 3) pulser LINES
     self.spline = True
@@ -288,6 +296,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if self.spline:
       self.bspline.Reset(V,E,dE)
       self.SplineB.SetParameters(self.zero_p, self.gain_p)
+#      self.SplineB.SetRange(200., 1500.)
       self.pulser_correction_fit_result = self.S0.Fit('SplineB','QRNS')
       x, e = np.fromiter(E, 'float64'), np.ndarray(len(E), 'float64')
       self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
@@ -296,15 +305,24 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if self.PB5 and not fin:
       for pk in self.PulsePeaks:
         pk['E']  = P['p0'] + P['p1']*pk['V']
-        pk['dE'] = e[self.PulsePeaks.index(pk)]
+#        pk['dE'] = e[self.PulsePeaks.index(pk)]
+    if self.spline:
+      return '#chi^{2}/NDF = %5.1f/%3d' % (P['Chi2'], P['NDF'])
+    else:
+      return '#chi^{2}/NDF = %5.1f/%3d' % (self.linear_scale_fit_result.Chi2(), self.linear_scale_fit_result.Ndf())
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Show_Energy_Scale(self):
+  def Show_Energy_Scale(self, quality):
     xmin, xmax, ymin, ymax = MultiGraphLimits(self.NLG)
     self.PADS[0].cd();  self.PADS[0].Clear();  self.PADS[0].SetGrid()
     self.NLG.Draw('AP');
     self.NLG.GetXaxis().SetLimits(   xmin, xmax); self.NLG.GetXaxis().SetTitle(' E_{#gamma} [keV]')
     self.NLG.GetYaxis().SetRangeUser(ymin, ymax); self.NLG.GetYaxis().SetDecimals()
+    self.Lg1.Clear()
+    self.Lg1.AddEntry(self.S0, 'reference lines', 'lpe')
+    self.Lg1.AddEntry(self.S1, 'pulser lines',    'lpe')
+    self.Lg1.AddEntry(self.S2, 'other lines',     'lpe')
+    self.Lg1.AddEntry(self.SplineB, quality, 'lpe')
     self.Lg1.Draw('SAME')
     if self.spline:  self.SplineB.Draw('SAME')
     self.cv.Modified();    self.cv.Update()
@@ -341,6 +359,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.RO.SetPoint(N-n-1, -p['E'], 100*p[K]['p3']/p['E']); self.RO.SetPointError(N-n-1, p['dE'], 100*p[K]['dp3']/p['E'])
       self.RO.SetPoint(N+n,    p['E'], 100*p[K]['p2']/p['E']); self.RO.SetPointError(N+n,   p['dE'], 100*p[K]['dp2']/p['E'])
 
+    """
     if self.rep3: self.eres.FixParameter(3, self.rep3)
     else:         self.eres.SetParLimits(3, -1500.00, 500.)
     self.real_resolution_fit_result = self.RC.Fit('eres','QRNS')
@@ -352,11 +371,18 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     print ' ║ Noise: %5.3f ± %5.3f keV │ Trapping:  %5.3f ± %5.3f ppm │ χ²/NDF:   %5.1f/%3d  ║' % PP1
     print ' ║ Fano fact: %5.3f ± %5.3f │ Threshold: %5.0f ± %5.0f keV │ Probability:  %5.3f  ║' % PP2
     print ' ╚══════════════════════════╧══════════════════════════════╧══════════════════════╝\n'
+    """
+    self.real_resolution_fit_result = self.RC.Fit('eres','QRNS')
+    P = fitParameters(self.eres)
+    PP1 = (P['p0'], P['dp0'], P['Chi2'], P['NDF'])
+    PP2 = (P['p1'], P['dp1'], P['p2'],   P['dp2'], self.real_resolution_fit_result.Prob())
+    print ' ╔ Resolution by isotopes: ═╤══════════════════════════════╤══════════════════════╗'
+    print ' ║ Noise: %5.3f ± %5.3f keV │ ---------------------------- │ χ²/NDF:   %5.1f/%3d  ║' % PP1
+    print ' ║ Fano fact: %5.3f ± %5.3f │ Fano left: %5.3f ± %5.3f keV │ Probability:  %5.3f  ║' % PP2
+    print ' ╚══════════════════════════╧══════════════════════════════╧══════════════════════╝\n'
 
-#    with open('p3_vs_p2.txt', 'a') as fp:
-#      fp.write('%5.3f  %5.3f  %5.0f  %5.0f\n' % (1e+6*P['p2'], 1e+6*P['dp2'], P['p3'], P['dp3']))
 
-    return quality
+    return '#chi^{2}/NDF = %5.1f/%3d' % (P['Chi2'], P['NDF'])
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Show_Energy_Resolution(self, quality):
@@ -380,45 +406,54 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     K='shape'
     for p in self.ScalePeaks + self.OtherPeaks + self.PulsePeaks:
       p[K]['p3' ] = p[K]['p3']*p[K]['p2']
-      p[K]['dp3'] = p[K]['p3']*p[K]['dp2']
-    print ' ╔ pulser: ══╤════════╤══════════╤════════╤════════╤═════════╤════════╤═══════════╗'
-    print ' ║ Line Name │ Counts │  Eγ,keV  │ σR,keV │ σL,keV │ Compton │ Backgr │   χ²/NDF  ║'
-    print ' ╟───────────┼────────┼──────────┼────────┼────────┼─────────┼────────┼───────────╢'
-    for p in self.PulsePeaks:
-      PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
-      print ' ║%11s│ %6.0f │ %8.2f │ %6.4f │ %6.4f │   ---   │ %6.0f │ %5.1f/%3d ║' % PP
-    print ' ╚═══════════╧════════╧══════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
+      p[K]['dp3'] = ((p[K]['p2']*p[K]['dp3'])**2 + (p[K]['p3']*p[K]['dp2'])**2)**0.5
+    if self.PB5:
+      print ' ╔ pulser: ══╤═════════╤═════════╤════════╤════════╤═════════╤════════╤═══════════╗'
+      print ' ║ Line Name │  Counts │ Eγ,keV  │ σR,keV │ σL,keV │ Compton │ Backgr │   χ²/NDF  ║'
+      print ' ╟───────────┼─────────┼─────────┼────────┼────────┼─────────┼────────┼───────────╢'
+      for p in self.PulsePeaks:
+        PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
+        print ' ║%11s│ %7.0f │ %7.2f │ %6.4f │ %6.4f │   ---   │ %6.0f │ %5.1f/%3d ║' % PP
+      print ' ╚═══════════╧═════════╧═════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
     print ' ╔ Calibration Isotopes: ════════╤════════╤════════╤═════════╤════════╤═══════════╗'
-    print ' ║ Line Name │ Counts │  Eγ,keV  │ σR,keV │ σL,keV │ Compton │ Backgr │   χ²/NDF  ║'
-    print ' ╟───────────┼────────┼──────────┼────────┼────────┼─────────┼────────┼───────────╢'
+    print ' ║ Line Name │  Counts │ Eγ,keV  │ σR,keV │ σL,keV │ exptail │ Backgr │   χ²/NDF  ║'
+    print ' ╟───────────┼─────────┼─────────┼────────┼────────┼─────────┼────────┼───────────╢'
     for p in self.ScalePeaks:
-      PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p4'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
-      print ' ║%11s│ %6.0f │ %8.2f │ %6.4f │ %06.4f │ %6.5f │ %6.0f │ %5.1f/%3d ║' % PP
-    print ' ╚═══════════╧════════╧══════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
-    print ' ╔ Other Isotopes: ═══╤══════════╤════════╤════════╤═════════╤════════╤═══════════╗'
-    print ' ║ Line Name │ Counts │  Eγ,keV  │ σR,keV │ σL,keV │ Compton │ Backgr │   χ²/NDF  ║'
-    print ' ╟───────────┼────────┼──────────┼────────┼────────┼─────────┼────────┼───────────╢'
+      PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p6'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
+      print ' ║%11s│ %7.0f │ %7.2f │ %6.4f │ %06.4f │ %7.3f │ %6.0f │ %5.1f/%3d ║' % PP
+    print ' ╚═══════════╧═════════╧═════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
+    print ' ╔ Other Isotopes: ════╤═════════╤════════╤════════╤═════════╤════════╤═══════════╗'
+    print ' ║ Line Name │  Counts │ Eγ,keV  │ σR,keV │ σL,keV │ exptail │ Backgr │   χ²/NDF  ║'
+    print ' ╟───────────┼─────────┼─────────┼────────┼────────┼─────────┼────────┼───────────╢'
     for p in self.OtherPeaks:
-      PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p4'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
-      print ' ║%11s│ %6.0f │ %8.2f │ %6.4f │ %06.4f │ %6.5f │ %6.0f │ %5.1f/%3d ║' % PP
-    print ' ╚═══════════╧════════╧══════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
+      PP = (p['name'], p[K]['p0']/self.gain, p[K]['p1'], p[K]['p2'], p[K]['p3'], p[K]['p6'], p[K]['p5'], p[K]['Chi2'], p[K]['NDF'])
+      print ' ║%11s│ %7.0f │ %7.2f │ %6.4f │ %06.4f │ %7.3f │ %6.0f │ %5.1f/%3d ║' % PP
+    print ' ╚═══════════╧═════════╧═════════╧════════╧════════╧═════════╧════════╧═══════════╝\n'
 
     G = 1./(self.gain*self.LiveT)
-    for p in self.OtherPeaks:
-      if 'In116' in p['name']:
-        filename = p['name'] + '.dat'
-        t, dt = 0.5*(self.UTB + self.UTE), 0.5*(self.UTE - self.UTB)
-        outs = "%10d  %5d  %6.4f  %6.4f\n" % (t, dt, G*p[K]['p0'], G*p[K]['dp0'])
-        with open(filename,'a') as f:  f.write(outs)
-
+#    for p in self.OtherPeaks:
+#      if 'In116' in p['name']:
+#        filename = p['name'] + '.dat'
+#        t, dt = 0.5*(self.UTB + self.UTE), 0.5*(self.UTE - self.UTB)
+#        outs = "%10d  %5d  %6.4f  %6.4f\n" % (t, dt, G*p[K]['p0'], G*p[K]['dp0'])
+#        with open(filename,'a') as f:  f.write(outs)
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def ShowScale(self,n):
     status = ['═══ Preset',' Corrected']
     print ' ╔%00000009s energy scale: ═══════════════╤═══════════════════════════════════════╗' % status[n]
-    print ' ║ γ-lines:                               │ pulser:                               ║'
+    if   n==0:
+      print ' ║ γ-lines:                               │ pulser:                               ║'
+    elif n==1:
+      sa = '%5.1f / %1d' % (self.linear_scale_fit_result.Chi2(),       self.linear_scale_fit_result.Ndf())
+      if self.PB5:
+        sb = '%5.2f / %1d' % (self.pulser_correction_fit_result.Chi2(),  self.pulser_correction_fit_result.Ndf())
+      else: 
+        sb = 'none/nan'
+      print ' ║ linear fit:         χ²/NDF = %9s │ pulser fit:        χ²/NDF = %9s ║' % (sa, sb)
     print ' ║ Zero = %5.3f keV, Gain = %6.4f keV/ch │ Zero = %5.3f keV, Gain = %6.1f keV/V ║' % (self.zero, self.gain, self.zero_p, self.gain_p)
     print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
+
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -429,22 +464,23 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 
     S = 'scale'
     if cfg.has_section(S):
-      self.zero = cfg.getfloat(S, 'zero');    self.gain = cfg.getfloat(S, 'gain')
-      self.emin = cfg.getfloat(S, 'emin');    self.emax = cfg.getfloat(S, 'emax')
-      self.fitL = cfg.getfloat(S, 'fitL');    self.fitR = cfg.getfloat(S, 'fitR')
-      self.nitr = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
-      self.erec = cfg.getfloat(S, 'erec');    self.tbpa = cfg.getfloat(S, 'tbpa')
-      self.expt = cfg.getfloat(S, 'expt')
-      if cfg.has_option(S, 'thre'):           self.rep3 = cfg.getfloat(S, 'thre')
-      else:                                   self.rep3 = 0.0
-      if cfg.has_option(S, 'escale'): self.scale = cfg.get(S, 'escale').split(', ')
-      if cfg.has_option(S, 'toshow'): self.names = cfg.get(S, 'toshow').split(', ')[0:4]
+      self.zero  = cfg.getfloat(S, 'zero');    self.gain = cfg.getfloat(S, 'gain')
+      self.emin  = cfg.getfloat(S, 'emin');    self.emax = cfg.getfloat(S, 'emax')
+      self.fitL  = cfg.getfloat(S, 'fitL');    self.fitR = cfg.getfloat(S, 'fitR')
+      self.nitr  = cfg.getint(  S, 'nitr');    self.amin = cfg.getfloat(S, 'amin')
+      self.erec  = cfg.getfloat(S, 'erec');    self.tbpa = cfg.getfloat(S, 'tbpa')
+      self.expt  = cfg.get(S, 'expt')
+      self.exp0  = cfg.getfloat(S, 'exp0');    self.exp1 = cfg.getfloat(S, 'exp1')
+      self.kapp  = ROOT.TF1('kapp', self.expt, self.emin, self.emax)
+      self.kapp.SetParameters(self.exp0, self.exp1)
+      self.scale = cfg.get(S, 'escale').split(', ')
+      self.names = cfg.get(S, 'toshow').split(', ')[0:4]
     else:
-      print 'Can not read configuration for scale!'; exit()
+      print 'Can not read configuration for scale!'
 
     S = 'pulser'
     if cfg.has_section(S):
-      self.zero_p = cfg.getfloat(S, 'zero_p'); self.gain_p = cfg.getfloat(S, 'gain_p')
+      self.zero_p = cfg.getfloat(S, 'zero_p'); self.gain_p = cfg.getfloat(S, 'gain_p'); self.eerr_p = cfg.getfloat(S, 'eerr_p')
     else:
       print 'Can not read configuration for pulser!'
 
@@ -452,20 +488,19 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def InitGraphics(self):
     # Energy Scale Section
-    self.S0   = ROOT.TGraphErrors(); self.S0.SetMarkerColor(self.Colors[0]); self.S0.SetMarkerStyle(self.Styles[0]); self.S0.SetMarkerSize(self.Sizes[0])
-    self.S1   = ROOT.TGraphErrors(); self.S1.SetMarkerColor(self.Colors[1]); self.S1.SetMarkerStyle(self.Styles[1]); self.S1.SetMarkerSize(self.Sizes[1])
-    self.S2   = ROOT.TGraphErrors(); self.S2.SetMarkerColor(self.Colors[2]); self.S2.SetMarkerStyle(self.Styles[2]); self.S2.SetMarkerSize(self.Sizes[2])
-    self.NLG.Add(self.S0); self.NLG.Add(self.S1); self.NLG.Add(self.S2)
-    self.Lg1  = ROOT.TLegend(0.62, 0.85, 0.99, 1.00, '', 'brNDC')
-    self.Lg1.AddEntry(self.S0, 'reference lines', 'lpe')
-    self.Lg1.AddEntry(self.S1, 'pulser lines',    'lpe')
-    self.Lg1.AddEntry(self.S2, 'other lines',     'lpe')
+    self.S0 = ROOT.TGraphErrors();          self.S1 = ROOT.TGraphErrors();          self.S2 = ROOT.TGraphErrors()
+    self.S0.SetMarkerColor(self.Colors[0]); self.S1.SetMarkerColor(self.Colors[1]); self.S2.SetMarkerColor(self.Colors[2])
+    self.S0.SetMarkerStyle(self.Styles[0]); self.S1.SetMarkerStyle(self.Styles[1]); self.S2.SetMarkerStyle(self.Styles[2])
+    self.S0.SetMarkerSize(self.Sizes[0]);   self.S1.SetMarkerSize(self.Sizes[1]);   self.S2.SetMarkerSize(self.Sizes[2])
+    self.NLG.Add(self.S0);                  self.NLG.Add(self.S1);                  self.NLG.Add(self.S2)
+    self.Lg1= ROOT.TLegend(0.62, 0.75, 0.99, 1.00, '', 'brNDC')
     # Energy Resolution Section
-    self.RC   = ROOT.TGraphErrors(); self.RC.SetMarkerColor(self.Colors[0]); self.RC.SetMarkerStyle(self.Styles[0]); self.RC.SetMarkerSize(self.Sizes[0])
-    self.RP   = ROOT.TGraphErrors(); self.RP.SetMarkerColor(self.Colors[2]); self.RP.SetMarkerStyle(self.Styles[1]); self.RP.SetMarkerSize(self.Sizes[1])
-    self.RO   = ROOT.TGraphErrors(); self.RO.SetMarkerColor(self.Colors[1]); self.RO.SetMarkerStyle(self.Styles[2]); self.RO.SetMarkerSize(self.Sizes[2])
-    self.ERG.Add(self.RC); self.ERG.Add(self.RP); self.ERG.Add(self.RO)
-    self.Lg2  = ROOT.TLegend(0.62, 0.75, 0.99, 1.00, '', 'brNDC')
+    self.RC = ROOT.TGraphErrors();          self.RP = ROOT.TGraphErrors();          self.RO = ROOT.TGraphErrors();
+    self.RC.SetMarkerColor(self.Colors[0]); self.RP.SetMarkerColor(self.Colors[2]); self.RO.SetMarkerColor(self.Colors[1])
+    self.RC.SetMarkerStyle(self.Styles[0]); self.RP.SetMarkerStyle(self.Styles[1]); self.RO.SetMarkerStyle(self.Styles[2])
+    self.RC.SetMarkerSize(self.Sizes[0]);   self.RP.SetMarkerSize(self.Sizes[1]);   self.RO.SetMarkerSize(self.Sizes[2])
+    self.ERG.Add(self.RC);                  self.ERG.Add(self.RP);                  self.ERG.Add(self.RO)
+    self.Lg2= ROOT.TLegend(0.62, 0.75, 0.99, 1.00, '', 'brNDC')
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -474,6 +509,11 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     W['infos'] = [self.UTB, self.UTE, self.ptype, self.PB5]
     W['scale'] = [self.zero, self.gain, self.zero_p, self.gain_p]
     W['peaks'] = [self.ScalePeaks, self.PulsePeaks, self.OtherPeaks]
+    if self.PB5:
+      W['scl_Q'] = [self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf()]
+    else:
+      W['scl_Q'] = [0.0, 0.0]
+    W['res_Q'] = [self.real_resolution_fit_result.Chi2(),   self.real_resolution_fit_result.Ndf()]
     with open(self.outfile,'a') as fp:  cPickle.dump(W, fp, -1)
     print 'Calibration results have been saved to %s' % self.outfile
 
@@ -494,13 +534,15 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         allp = [int(el['shape']['p1']) for el in self.ScalePeaks + self.PulsePeaks + self.OtherPeaks]
         self.OtherPeaks = []
         if len(self.PulsePeaks) < 3: self.PB5 = False
-        self.Do_Energy_Scale(0);     self.Show_Energy_Scale()
+        self.Show_Energy_Scale(self.Do_Energy_Scale(True))
         self.Show_Energy_Resolution(self.Do_Energy_Resolution())
         x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
         self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
         dW = er[0]
-        self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
-        C,  dC = self.SplineB.Eval(w), er[0]
+        if self.PB5:
+          self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
+          C,  dC = self.SplineB.Eval(w), er[0]
+        else: C, dC = 0.0, 0.0
         self.real_resolution_fit_result.GetConfidenceIntervals(2, 1, 1, x, er, 0.683, False)
         SR, dSR = 0.01*w*self.eres.Eval( w), 0.01*w*er[0]
         SL, dSL = 0.01*w*self.eres.Eval(-w), 0.01*w*er[1]
@@ -527,6 +569,100 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         if t!=0.0:                    OD['X' ].append(allp)
         if pause: raw_input('Press <Enter> to proceed')
     return(OD)
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def Check_Resolution_Model(self):
+    from numpy import asarray
+    ROOT.gStyle.SetOptFit(1111)
+    
+    def Weighted_Averages(D):
+      S0, S1, S2 = 0.0, 0.0, 0.0
+      for [v, s] in D:
+        w = 1.0 if not s else 1.0/s**2
+        S0 += v*w; S1 += v*v*w; S2 += w
+      return S0/S2, (S1/S2 - (S0/S2)**2)**0.5
+      
+    d = [] 
+    with open(self.outfile,'rb') as fp:
+      while True:
+        try:   d.append(cPickle.load(fp))
+        except EOFError: break
+    
+    hs = ROOT.TH1I('hs','', 20, 0., 20.)
+    fs = ROOT.TF1( 'fs', '[0]*ROOT::Math::chisquared_pdf(x,[1])', 0., 20.)
+    hr = ROOT.TH1I('hr','', 20, 0., 40.)
+    fr = ROOT.TF1( 'fr', '[0]*ROOT::Math::chisquared_pdf(x,[1])', 0., 40.)
+    D = {}
+    ScPks = {}
+    n, ndfs, ndfr = 0.0, 0.0, 0.0
+    for p in d[0]['peaks'][0]: 
+      D[p['E']] = {'R':[], 'L':[], 'K':[]}
+      ScPks[p['E']] = {'name':p['name'], 'Chi2':[], 'Ndf':[]}
+    for rec in d:
+      hs.Fill(rec['scl_Q'][0]); ndfs += rec['scl_Q'][1]
+      hr.Fill(rec['res_Q'][0]); ndfr += rec['res_Q'][1]
+      n   += 1.0
+      ScalePeaks = rec['peaks'][0]
+      for p in ScalePeaks:
+        D[p['E']]['R'].append([p['shape']['p2'], p['shape']['dp2']])
+        D[p['E']]['L'].append([p['shape']['p3'], p['shape']['dp3']])
+        D[p['E']]['K'].append([p['shape']['p6'], p['shape']['dp6']])
+        ScPks[p['E']]['Chi2'].append(p['shape']['Chi2'])
+        ScPks[p['E']]['Ndf' ].append(p['shape']['NDF' ])
+    print '%d points found' % n
+    ndfs = ndfs / n; ndfr = ndfr / n
+    hs.SetNameTitle('hs', 'scale fit: #chi^{2} distribution (NDF = %.2f)' % ndfs)
+    hs.SetLineWidth(2);    hs.GetXaxis().SetTitle('#chi^{2}')
+    fs.SetParameters(n, ndfs); fs.SetLineColor(ROOT.kRed)
+    hr.SetNameTitle('hr', 'resolution fit: #chi^{2} distribution (NDF = %.2f)' % ndfr)
+    hr.SetLineWidth(2);    hr.GetXaxis().SetTitle('#chi^{2}')
+    fr.SetParameters(2*n, ndfr); fr.SetLineColor(ROOT.kRed)
+
+    n = 0
+    gR, gL, gK = ROOT.TGraphErrors(), ROOT.TGraphErrors(), ROOT.TGraphErrors()
+    for k,v in D.iteritems():
+      R, dR = Weighted_Averages(v['R']); gR.SetPoint(n, k, R); gR.SetPointError(n, 0.0, dR)
+      L, dL = Weighted_Averages(v['L']); gL.SetPoint(n, k, L); gL.SetPointError(n, 0.0, dL)
+      K, dK = Weighted_Averages(v['K']); gK.SetPoint(n, k, K); gK.SetPointError(n, 0.0, dK)
+      n += 1
+    gR.SetMarkerStyle(20); gR.SetMarkerColor(ROOT.kRed);  gR.SetLineColor(ROOT.kRed)
+    gL.SetMarkerStyle(21); gL.SetMarkerColor(ROOT.kBlue); gL.SetLineColor(ROOT.kBlue)
+    gK.SetMarkerStyle(20); gK.SetMarkerColor(ROOT.kRed);  gK.SetLineColor(ROOT.kRed)
+    fR = ROOT.TF1('fR', 'sqrt([0]**2 + [1]*2.96e-3*x)')
+    fL = ROOT.TF1('fL', 'sqrt([0]**2 + [1]*2.96e-3*x)')
+    gK.SetNameTitle('', 'f(x) = ' + self.expt)
+    self.cv.Clear();  self.cv.Divide(2, 2) 
+    self.cv.cd(1);    self.cv.GetPad(1).SetGrid() 
+    gL.Draw('AP');    gL.Fit('fL');  gL.GetYaxis().SetTitle('#sigma_{L} [keV]')
+    gR.Draw('PSAME'); gR.Fit('fR');  gR.GetYaxis().SetTitle('#sigma_{R} [keV]'); gR.GetXaxis().SetTitle('keV')
+    self.cv.cd(2);    self.cv.GetPad(2).SetGrid() 
+    gK.Draw('AP');                   gK.GetYaxis().SetTitle('#kappa [a.u.]');  gK.GetXaxis().SetTitle('keV')
+    if self.exp0 == 0.0:  gK.Fit('kapp')
+    else:                 self.kapp.Draw('SAME')
+    self.cv.cd(3);    self.cv.GetPad(3).SetGrid();    hs.Draw('HIST'); fs.Draw('SAME')
+    self.cv.cd(4);    self.cv.GetPad(4).SetGrid();    hr.Draw('HIST'); fr.Draw('SAME')
+    self.cv.Modified(); self.cv.Update()
+    
+    n, plt = 0, {'C':[], 'H':[], 'F':[]}
+    for e,t in ScPks.iteritems():
+      plt['C'].append(ROOT.TCanvas(str(e), ScPks[e]['name'], n*10+10, n*10+10, 400, 400))
+      plt['H'].append(ROOT.TH1I('H%02d' % n, '', 100, 0., 200.))
+      plt['F'].append(ROOT.TF1( 'F%02d' % n, '[0]*ROOT::Math::chisquared_pdf(x,[1])', 0., 200.))
+      np, ndf = len(t['Chi2']), 0.0
+      for i in range(np):
+        plt['H'][n].Fill(t['Chi2'][i])
+        ndf += t['Ndf'][i]
+      ndf = ndf/np
+      plt['C'][n].cd(); plt['C'][n].SetGridx(); plt['C'][n].SetGridy()
+      plt['H'][n].SetNameTitle('H%02d' % n, 'E = %.3f keV, NDF = %.1f' % (e,ndf))
+      plt['H'][n].Draw('HIST')
+      plt['F'][n].SetParameters(2*np, ndf)
+      plt['F'][n].SetLineColor(ROOT.kRed)
+      plt['F'][n].Draw('SAME')
+      plt['C'][n].Modified(); plt['C'][n].Update()
+      n += 1
+    raw_input('Have a look, then press <Enter> to exit.')
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Check_Scale(self, energy, prompt):
@@ -565,8 +701,8 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     T2 = 'Resolution for %5.0f keV #gamma-rays. Average #sigma_{L}/#sigma_{R} = %5.3f #pm %5.3f.' % (energy, R, dR)
     g2 = ROOT.TMultiGraph('g2','resolution'); g2.Add(e3); g2.Add(e4); g2.SetTitle(T2)
     l2 = ROOT.TLegend(0.75, 0.75, 0.98, 0.95, '', 'brNDC');
-    l2.AddEntry(e3, '#sigma_{RIGHT} for %5.0f keV #gamma-rays' % energy, 'lpe')
-    l2.AddEntry(e4, '#sigma_{LEFT}  for %5.0f keV #gamma-rays' % energy, 'lpe')
+    l2.AddEntry(e3, '#sigma_{R}', 'lpe')
+    l2.AddEntry(e4, '#sigma_{L}', 'lpe')
 
     cs = ROOT.TCanvas('cs','scale & resolution', 2, 2, 1202, 1002); cs.Divide(1,2)
     cs.cd(1); cs.GetPad(1).SetGrid(); g1.Draw('AP');  l1.Draw()
@@ -584,31 +720,67 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     raw_input('Have a look, then press <Enter> to exit.')
     self.cv.cd(); self.cv.Clear(); self.cv.Modified(); self.cv.Update() # This is to prevent segmentation fault on exit()
 
-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-class LineShape: # monochromatic gamma line responce  # class # class # class # class # class # class # class # class # class
-  # P0  | P1 | P2      | P3      | P4      | P5         |
-  # Amp | X0 | Sigma_R | Sigma_L | Compton | Background |
-  def __init__(self, k):
-    self.k  = k
+"""
+class LineShape: # monochromatic gamma line response  # class # class # class # class # class # class # class # class # class
+  # P0  | P1 | P2      | P3      | P4      | P5         | P6
+  # Amp | X0 | Sigma_R | Sigma_L | Compton | Background | kappa
+  def __init__(self):
     self.t0 = (0.5 / ROOT.TMath.Pi())**0.5
     self.t1 = (0.5 * ROOT.TMath.Pi())**0.5
-    self.t2 = ROOT.TMath.Exp(- 0.5 * k**2) / k + self.t1 * ROOT.TMath.Erf(0.5**0.5 * k)
   def __call__(self, x, p):
     X = x[0]-p[1]
     if p[4]==100.0: # i.e. for symmetric (pulser) peaks
       return self.t0 * ROOT.TMath.Exp(-0.5*(X/p[2])**2) * p[0] / p[2] + p[5]
     SL = p[2]*p[3]
-    if    X >  0.0:            f =                   ROOT.TMath.Exp(-0.5*( X/p[2])**2)
-    elif  X < -self.k*SL:      f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(self.k*X/SL + 0.5*self.k**2)
-    else:                      f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(-0.5*( X/SL)**2)
-
-    return p[0] * f/(p[2]*(self.t1 + p[3]*self.t2)) + p[5]
-
+    if    X >  0.0:       f =                   ROOT.TMath.Exp(-0.5*( X/p[2])**2)
+    elif  X < -p[6]*SL:   f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(p[6] * X/SL + 0.5*p[6]**2)
+    else:                 f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(-0.5*( X/SL)**2)
+    
+    nr = ROOT.TMath.Exp(- 0.5*p[6]**2) / p[6]  +  self.t1 * ROOT.TMath.Erf(0.5**0.5 * p[6])
+    return p[0] * f / ((1.0-p[4]) * nr * SL + p[2] * self.t1)  +  p[5]
+"""
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+class LineShape: # monochromatic gamma line response  # class # class # class # class # class # class # class # class # class
+  # P0  | P1 | P2      | P3      | P4      | P5         | P6
+  # Amp | X0 | Sigma_R | Sigma_L | Compton | Background | kappa
+  t0 = (0.5 / ROOT.TMath.Pi())**0.5
+  t1 = (0.5 * ROOT.TMath.Pi())**0.5
+  pp = 0.5**0.5
+  
+  def __call__(self, x, p):
+    X = x[0]-p[1]
+    if p[4]==100.0: # i.e. for symmetric (pulser) peaks
+      return self.t0 * ROOT.TMath.Exp(-0.5*(X/p[2])**2) * p[0] / p[2] + p[5]
+    SL = p[2]*p[3]
+    if    X >  0.0:     f = ROOT.TMath.Exp(-0.5*(X/p[2])**2)
+    elif  X < -p[6]*SL: f = ROOT.TMath.Exp(p[6] *X/SL + 0.5*p[6]**2)
+    else:               f = ROOT.TMath.Exp(-0.5*(X/SL)**2)
+    nr = ROOT.TMath.Exp(- 0.5*p[6]**2) / p[6]  +  self.t1 * ROOT.TMath.Erf( self.pp * p[6])
+    try:
+      R = p[0] * f / (nr * SL + p[2] * self.t1)  +  0.5 * p[4] * ROOT.TMath.Erfc(self.pp * X/p[2])  +  p[5]
+      return R
+    except TypeError:
+      print self.pp, X, p[2]
+      exit()     
+    
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+class ResolutionModel: # Combine resolution model # class # class # class # class # class # class # class # class # class
+  # P0    | P1     | P2     |
+  # Noise | Fano_R | Fano_L |
+  pce    = 2.96e-3     # electron-hole pair creation energy in Ge, keV
+
+  def __call__(self, x, p):
+    X = abs(x[0])
+    if x[0]<0.0:
+      return 1.e+2 / X * ROOT.TMath.Sqrt(p[0]**2 + p[2]*self.pce*X)
+    elif x[0]>0.0:
+      return 1.e+2 / X * ROOT.TMath.Sqrt(p[0]**2 + p[1]*self.pce*X)
+    else: return 100.0
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+"""
 class ResolutionModel: # Combine resolution model # class # class # class # class # class # class # class # class # class
   # P0    | P1   | P2         | P3               |
   # Noise | Fano | Trapping K | Threshold Energy |
@@ -621,12 +793,12 @@ class ResolutionModel: # Combine resolution model # class # class # class # clas
     elif x[0]>0.0:
       return 1.e+2 / X * ROOT.TMath.Sqrt(p[0]**2 + p[1]*self.pce*X                   )
     else: return 100.0
-
+"""
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 def fitParameters(fitf):
   pl, np = {}, fitf.GetNumberFreeParameters()
-  pl['Chi2'], pl['NDF'] = fitf.GetChisquare(),  fitf.GetNDF()
+  pl['Chi2'], pl['NDF'], pl['Prob'] = fitf.GetChisquare(),  fitf.GetNDF(),  fitf.GetProb()
   for p in range(np):  pl['p'+str(p)], pl['dp'+str(p)] = fitf.GetParameter(p), fitf.GetParError(p)
   return pl
 

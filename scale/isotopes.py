@@ -438,14 +438,14 @@ class Photopeak_A: # Asymmetric photopeak has 5 parameters:
     elif   -p[4]*p[3] < X  <  0.0:  f = ROOT.TMath.Exp(-0.5*(X/p[3])**2)
     else:                           f = ROOT.TMath.Exp(p[4]*X/p[3] + 0.5*p[4]**2)
     N1 = p[3]/p[4]*ROOT.TMath.Exp(-0.5*p[4]**2) + self.sq*(p[3]*ROOT.TMath.Erf(p[4]*self.tw) + p[2])
-    return 0.75*p[0]*f/N1
+    return 0.96*p[0]*f/N1
 
 class Photopeak_S: # Symmetric photopeak has 3 parameters:
 #  P0  | P1 | P2
 #  Amp | X0 | Sigma
   isq = (0.5/ROOT.TMath.Pi())**0.5
   def __call__(self, x, p):
-    return 0.25*p[0] * ROOT.TMath.Exp(-0.5*((x[0]-p[1])/p[2])**2) * self.isq/p[2]
+    return 0.04*p[0] * ROOT.TMath.Exp(-0.5*((x[0]-p[1])/p[2])**2) * self.isq/p[2]
 
 class Photopeak(Photopeak_A,Photopeak_S): # Complex photopeak has 7 parameters
 #  P0  | P1 | P2      | P3      | P4    | P5   | P6

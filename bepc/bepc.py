@@ -28,11 +28,15 @@ class EDGE:
     self.ETuner  =               cfg.getfloat('edge', 'EbepcTuner')
     self.Asymme  =               cfg.getfloat('edge', 'Asymmetry')
     self.SaveDB  =     ssh and cfg.getboolean('edge', 'SaveForDB')
+    
+    self.expA = cfg.getfloat('scale', 'expA')
+    self.expE = cfg.getfloat('scale', 'expE')
 
     self.cc      = ROOT.TCanvas('cc','BEMS for BEPC-II', 800, 600, 800, 600); # self.cc.Divide(1,2)
     self.const   = ROOT.TF1('const', '[0]')
-    self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7); self.simple.SetLineColor(ROOT.kRed)
-    self.comple  = ROOT.TF1('comple', EdgeComple(), 0, 1, 9); self.comple.SetLineColor(ROOT.kAzure)
+    self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7);  self.simple.SetLineColor(ROOT.kRed); self.simple.SetNpx(500)
+    self.edgeco = EdgeComple()
+    self.comple  = ROOT.TF1('comple', self.edgeco, 0, 1, 7); self.comple.SetLineColor(ROOT.kAzure); self.comple.SetNpx(500)
     self.Lg1     = ROOT.TLegend(0.55, 0.71, 0.98, 0.91, '', 'brNDC');
     self.Lg2     = ROOT.TLegend(0.55, 0.49, 0.98, 0.69, '', 'brNDC');
     self.HPGe    = Scale(scalefile, cfg_file, 'application')
@@ -61,9 +65,9 @@ class EDGE:
          if Edge:
            R = self.Beam_Energy(UTB, UTE, Edge)
            if R:
-             self.Save_Files((R['t'], R['dt'], R['E'], R['dE'], R['S'], R['dS']))
+             self.Save_Files(R)
              if self.SaveDB:
-               self.Save_DB((R['t'], R['dt'], R['Eo'], R['dE1'], R['BS'], R['dBS']))
+               self.Save_DB((R['t'], R['dt'], R['E'], R['dE'], R['S'], R['dS']))
                self.Save_WWW()
            return R
     else: return False
@@ -114,10 +118,14 @@ class EDGE:
 
     Ebeam = self.BEPC[self.lepton]['E'] # MeV
     if self.Asymme>=1.0: self.RL = self.Asymme*self.RR
-    # Amplitude | Position | Sigma | edge tilt ~x | edge tilt ~x^2 | Background | Background Slope | Sigma_R | Sigma_L |
-    self.comple.SetParameters(E['p0'], E['p1'], S, E['p3'], E['p4'], E['p5'], E['p6'], self.RR, self.RL);
-    FIXED = [5,6,7,8];
+    # Amplitude | Position | Sigma | edge tilt ~x | edge tilt ~x^2 | Background | Background Slope | 
+    kappa = self.expA*ROOT.TMath.Exp((self.expE/W)**0.5)
+    self.edgeco.ExtParameters(self.RR, self.RL, kappa)
+    self.comple.SetParameters(E['p0'], E['p1'], S, E['p3'], E['p4'], E['p5'], E['p6'])
+    
+    FIXED = [5,6];
     for n in FIXED: V = self.comple.GetParameter(n); self.comple.FixParameter(n,V)
+
     R = self.hps.Fit('comple','RSQN')
     if R.Status(): return False
     for n in FIXED: self.comple.ReleaseParameter(n)
@@ -126,21 +134,22 @@ class EDGE:
 
     print ' ╔ Complex Edge Fit: ══════════╤════════════════════════╤═════════════════════════╗'
     print ' ║ Range from %4.0f to %4.0f keV │ Amplitude = %6.1f     │  W_max = %9.3f keV  ║' % (E1, E2, E['p0'], E['p1'])
-    print ' ║    σR = %6.3f ± %5.3f keV  │  σL = %5.2f ± %4.2f keV │     σW  = %6.3f keV    ║' % (self.RR, self.dRR, self.RL, self.dRL, S)
+    print ' ║     σR = %6.3f ± %5.3f keV │ σL = %6.3f ± %4.2f keV │  exp. tail κ  = %6.3f  ║' % (self.RR, self.dRR, self.RL, self.dRL, kappa)
     print ' ╟─────────────────────────────┴────────┬───────────────┴─────────────────────────╢'
     print ' ║ Edge amplitude: %8.1f ± %6.1f    │ Edge wmax, keV:   %8.3f ± %7.3f    ║' % (Ec['p0'], Ec['dp0'], Ec['p1'], Ec['dp1'])
     print ' ║ Edge σW, keV:     %6.3f ± %5.3f     │ Background:       %8.1f ± %7.1f    ║' % (Ec['p2'], Ec['dp2'], Ec['p5'], Ec['dp5'])
-    print ' ║ HPGe σR, keV:     %6.3f ± %5.3f     │ HPGe σL, keV:  %10.3f ± %10.3f  ║' % (Ec['p7'], Ec['dp7'], Ec['p8'], Ec['dp8'])
+#    print ' ║ HPGe σR, keV:     %6.3f ± %5.3f     │ HPGe σL, keV:  %10.3f ± %10.3f  ║' % (self.RR, 0.0, self.RL, 0.0)
     print ' ╟──────────────────────────────────────┼─────────────────────────────────────────╢'
     print ' ║         χ²/NDF = %5.1f/%3d           │          Probability: %5.3f             ║' % (Ec['Chi2'], Ec['NDF'], Prob)
     print ' ╚══════════════════════════════════════╧═════════════════════════════════════════╝\n'
 
-    self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (Ec['Chi2'], Ec['NDF'], Prob))
+    self.Lg2.Clear(); self.Lg2.SetHeader('#chi^{2}/NDF = %5.1f/%3d (Prob: %5.3f)' % (Ec['Chi2'], Ec['NDF'], Prob))
     self.Lg2.AddEntry(self.comple, '#omega_{max} =  %7.2f #pm %4.2f keV' % (Ec['p1'], Ec['dp1']), 'l')
     self.Lg2.AddEntry(self.comple, '#sigma_{R} = %5.2f keV;  #sigma_{L} = %5.2f keV' % (self.RR, self.RL), 'l')
     self.Lg2.AddEntry(self.comple, '#sigma_{beam} = %7.2f #pm %4.2f keV' % (Ec['p2'], Ec['dp2']), 'l')
-    self.comple.DrawCopy('SAME'); self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
 
+    self.comple.DrawCopy('SAME'); self.Lg2.Draw('SAME'); self.cc.Modified(); self.cc.Update()
+#    raw_input()
 #    print ' Wmax: %7.2f ± %4.2f keV (symmetric fit)'      % (E['p1'], E['dp1'])
 #    Wmax, dWmax = Ec['p1'],  Ec['dp1']
 #    print ' Wmax: %7.2f ± %4.2f keV (asymmetric fit)'     % (Wmax, dWmax)
@@ -177,7 +186,7 @@ class EDGE:
     st  = 'Measurement time '
     st += time.strftime('from %Y.%m.%d/%H:%M:%S', time.localtime(utb))
     st += time.strftime(' to %Y.%m.%d/%H:%M:%S', time.localtime(ute))
-    print '\n ╔ %8s Beam Energy Determination:  ══════════════════════════════════════════╗' % self.lepton
+    print ' ╔ %8s Beam Energy Determination:  ══════════════════════════════════════════╗' % self.lepton
     print ' ║      BEPC beam energy = %8.3f ± %5.3f MeV was taken from database           ║' % (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'])
     print ' ║    %66s          ║' % (st)
     print ' ║                                                                                ║'
@@ -227,10 +236,11 @@ class EDGE:
     return Eo*k/(1.+k)
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def Save_Files(self, results):
+  def Save_Files(self, R):
     print 'Saving (%s) to history file' % (self.lepton)
-    S = results + (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'], self.BEPC[self.lepton]['I'], self.BEPC[self.lepton]['dI'])
-    S = '%10d  %5d  %8.3f  %5.3f  %5.0f  %5.0f  %7.2f  %4.2f  %3.0f  %3.0f\n' % S
+    S  = (R['t'], R['dt'], R['E'], R['SRC'], R['dE1'], R['dE2'], R['dE3'], R['S'], R['dS'])
+    S += (self.BEPC[self.lepton]['E'], self.BEPC[self.lepton]['dE'], self.BEPC[self.lepton]['I'], self.BEPC[self.lepton]['dI'])
+    S = '%10d  %5d  %8.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.0f  %5.0f  %7.2f  %4.2f  %3.0f  %3.0f\n' % S
     if   'electron' in self.lepton:
       with open('E.results','a') as f:  f.write(S)
     elif 'positron' in self.lepton:
@@ -293,18 +303,74 @@ class EdgeSimple():
     T2 = (    p[3] + 2*p[4]*X   ) * Ex * p[2]
     T3 = p[4]*p[2]**2 * (Er + X * Ex)
     return p[0] * (T1 - T2 + T3) + p[5] + X * p[6]
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 
 
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class EdgeComple():
   """
-  Edge Complex has 9 parameters:
-  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt | Sigma_R | Sigma_L
-  F1, F2, F3 have 3 parameters:  Sigma_R | Sigma_L | Sigma_S |
+  Edge Complex has 7 parameters:
+  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt 
+  F1, F2, F3 have 1 parameter: Sigma_S 
   """
+  infty  = 10
+  setpar = 0.0
+  def ExtParameters(self, SR, SL, Ka):
+    sqhp   = (0.5*ROOT.TMath.Pi())**0.5
+    self.norm    = 0.5 / (sqhp*SR + (ROOT.TMath.Exp(-0.5*Ka**2)/Ka + sqhp*ROOT.TMath.Erf(0.5**0.5*Ka))*SL)
+    D1 = '(%.4f + [0]**2)' % (SR*SR)
+    D2 = '(%.4f + [0]**2)' % (SL*SL)
+    D3 = ' %.4f' % (Ka/SL)
+    D4 = ' %.4f' % ((Ka/SL)**2)
+    SR = ' %.4f' % SR
+    SL = ' %.4f' % SL
+    if Ka < 2.0:
+      Ka = ' %.4f' % Ka
+      T  = '%s * exp(-0.5*x*x/%s) *  TMath::Erfc(-0.7071*x*%s/[0]/sqrt%s) / sqrt%s + '  % (SR, D1, SR, D1, D1)
+      T += '%s * exp(-0.5*x*x/%s) * (TMath::Erfc( 0.7071*x*%s/[0]/sqrt%s) / sqrt%s - '  % (SL, D2, SL, D2, D2)
+      T +=                          'TMath::Erfc( 0.7071*(%s*%s + x*%s)/[0]/sqrt%s) )'  % (Ka, D2, SL, D2)
+      T += '+ exp(0.5*%s*%s + %s*x)* TMath::Erfc( 0.7071*(%s*%s + %s*x)/[0]/%s)'        % (D4, D2, D3, Ka, D2, SL, SL)
+      T  = '(' + T + ')' # / (sqrt(pi)*([0]+[1])) '
+    else:
+      T  = '%s * exp(-0.5*x*x/%s) *  TMath::Erfc(-0.7071*x*%s/[0]/sqrt%s) / sqrt%s + '  % (SR, D1, SR, D1, D1)
+      T += '%s * exp(-0.5*x*x/%s) *  TMath::Erfc( 0.7071*x*%s/[0]/sqrt%s) / sqrt%s   '  % (SL, D2, SL, D2, D2)
+      T  = '(' + T + ')' # / (sqrt(pi)*([0]+[1])) '
+    self.F1 = ROOT.TF1('F1',          T,  0.0, 1.0)
+    self.F2 = ROOT.TF1('F2', 'x*'   + T , 0.0, 1.0)
+    self.F3 = ROOT.TF1('F3', 'x*x*' + T , 0.0, 1.0)
+
+  def __call__(self, x, p):
+    self.curpar =           p[2]
+    infinity = self.infty * p[2]
+    self.F1.SetParameter(0, p[2])
+    self.F2.SetParameter(0, p[2])
+    self.F3.SetParameter(0, p[2])
+    X = x[0]-p[1]
+    if X < infinity:
+      if self.setpar == self.curpar:
+        self.I1 += self.F1.Integral(X, self.Xo)
+        self.I2 += self.F2.Integral(X, self.Xo)
+        self.I3 += self.F3.Integral(X, self.Xo)
+      else:
+        self.setpar  = self.curpar
+        self.I1  = self.F1.Integral(X, infinity)
+        self.I2  = self.F2.Integral(X, infinity)
+        self.I3  = self.F3.Integral(X, infinity)
+    self.Xo = X
+#    print X, infinity
+#    print self.I1
+#    print self.I2
+#    print self.I3
+#    raw_input()
+    return p[0] * self.norm * (self.I1*(1 + p[3]*X + p[4]*X**2) - (p[3] + 2*p[3]*p[4])*self.I2 + p[4]**2*self.I3) + p[5] + X * p[6]
+
+
+"""
+class EdgeComple():
+  
+#  Edge Complex has 7 parameters:
+#  Amplitude | Position | Sigma_S | edge tilt ~x | edge tilt ~x^2 | Background | Background Tilt | Sigma_R | Sigma_L
+#  F1, F2, F3 have 3 parameters:  Sigma_R | Sigma_L | Sigma_S |
+  
   infty = 20
   D1 = '(2*([0]**2 + [2]**2))'; D2 = '(2*([1]**2 + [2]**2))'
   T  = '[0]*exp(-x**2/%s) * TMath::Erfc(-x*[0]/([2]*sqrt%s)) / sqrt%s + ' % (D1,D1,D1)
@@ -332,9 +398,7 @@ class EdgeComple():
       self.I3  = self.F3.Integral(X, self.infty * p[2])
     self.Xo = X
     return p[0] * (self.I1*(1 + p[3]*X + p[4]*X**2) - (p[3] + 2*p[3]*p[4])*self.I2 + p[4]**2*self.I3) + p[5] + X * p[6]
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-
+"""
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

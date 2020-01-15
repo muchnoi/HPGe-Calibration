@@ -296,20 +296,22 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if self.spline:
       self.bspline.Reset(V,E,dE)
       self.SplineB.SetParameters(self.zero_p, self.gain_p)
-#      self.SplineB.SetRange(200., 1500.)
       self.pulser_correction_fit_result = self.S0.Fit('SplineB','QRNS')
-      x, e = np.fromiter(E, 'float64'), np.ndarray(len(E), 'float64')
-      self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
-      P = fitParameters(self.SplineB)
-      self.zero_p, self.gain_p = P['p0'], P['p1']
-    if self.PB5 and not fin:
-      for pk in self.PulsePeaks:
-        pk['E']  = P['p0'] + P['p1']*pk['V']
+      if self.pulser_correction_fit_result.Prob() < 0.00001:
+        self.spline = False
+      else:
+        x, e = np.fromiter(E, 'float64'), np.ndarray(len(E), 'float64')
+        self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
+        P = fitParameters(self.SplineB)
+        self.zero_p, self.gain_p = P['p0'], P['p1']
+        if not fin:
+          for pk in self.PulsePeaks:
+            pk['E']  = P['p0'] + P['p1']*pk['V']
 #        pk['dE'] = e[self.PulsePeaks.index(pk)]
     if self.spline:
-      return '#chi^{2}/NDF = %5.1f/%3d' % (P['Chi2'], P['NDF'])
+      return '#chi^{2}/NDF = %5.1f/%3d' % (self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf())
     else:
-      return '#chi^{2}/NDF = %5.1f/%3d' % (self.linear_scale_fit_result.Chi2(), self.linear_scale_fit_result.Ndf())
+      return '#chi^{2}/NDF = %5.1f/%3d' % (self.linear_scale_fit_result.Chi2(),      self.linear_scale_fit_result.Ndf())
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Show_Energy_Scale(self, quality):
@@ -445,13 +447,13 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if   n==0:
       print ' ║ γ-lines:                               │ pulser:                               ║'
     elif n==1:
-      sa = '%5.1f / %1d' % (self.linear_scale_fit_result.Chi2(),       self.linear_scale_fit_result.Ndf())
-      if self.PB5:
+      sa = '%5.1f / %1d'   % (self.linear_scale_fit_result.Chi2(),       self.linear_scale_fit_result.Ndf()     )
+      if self.spline:
         sb = '%5.2f / %1d' % (self.pulser_correction_fit_result.Chi2(),  self.pulser_correction_fit_result.Ndf())
       else: 
         sb = 'none/nan'
       print ' ║ linear fit:         χ²/NDF = %9s │ pulser fit:        χ²/NDF = %9s ║' % (sa, sb)
-    print ' ║ Zero = %5.3f keV, Gain = %6.4f keV/ch │ Zero = %5.3f keV, Gain = %6.1f keV/V ║' % (self.zero, self.gain, self.zero_p, self.gain_p)
+    print ' ║ Zero = %5.3f keV, Gain = %6.4f keV/ch │ Zero = %5.2f keV, Gain = %6.2f keV/V ║' % (self.zero, self.gain, self.zero_p, self.gain_p)
     print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
 
 
@@ -539,7 +541,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
         self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
         dW = er[0]
-        if self.PB5:
+        if self.spline:
           self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
           C,  dC = self.SplineB.Eval(w), er[0]
         else: C, dC = 0.0, 0.0
@@ -713,12 +715,42 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 
     cs.Modified(); cs.Update(); cs.SaveAs(self.outfile + '.pdf')
 
-    print 'Average energy      = %8.3f ± %8.3f keV' % (p1, dp1)
-    print 'Average correction  = %8.3f ± %8.3f keV' % (p2, dp2)
-    print 'Average right sigma = %8.3f ± %8.3f keV' % (p3, dp3)
-    print 'Average left  sigma = %8.3f ± %8.3f keV' % (p4, dp4)
+    print 'Average linear energy    = %8.3f ± %8.3f keV' % (p1, dp1)
+    print 'Average corrected energy = %8.3f ± %8.3f keV' % (p2, dp2)
+    print 'Average resolution σR    = %8.3f ± %8.3f keV' % (p3, dp3)
+    print 'Average resolution σL    = %8.3f ± %8.3f keV' % (p4, dp4)
     raw_input('Have a look, then press <Enter> to exit.')
     self.cv.cd(); self.cv.Clear(); self.cv.Modified(); self.cv.Update() # This is to prevent segmentation fault on exit()
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def Check_Pulser(self, energy):
+    from numpy import asarray
+    d = [] 
+    with open(self.outfile,'rb') as fp:
+      while True:
+        try:   d.append(cPickle.load(fp))
+        except EOFError: break
+    P_true, n_true, P_fals, n_fals, P_all = ROOT.TGraph(), 0, ROOT.TGraph(), 0, ROOT.TMultiGraph()
+    for rec in d:
+      t, PB5 = 0.5*(rec['infos'][0] + rec['infos'][1]), rec['infos'][3]
+      P0, P1 =      rec['scale'][2],  rec['scale'][3]
+#      print '%10d  %8.3f  %8.3f %d' % (t, P0, P1, PB5)
+      if PB5:
+        P_true.SetPoint(n_true, t, (energy - P0)/P1); n_true  += 1
+      else:
+        P_fals.SetPoint(n_fals, t, (energy - P0)/P1); n_fals += 1
+    self.cv.cd();              self.cv.SetTitle('Pulser Check');   self.cv.SetGrid()
+    P_true.SetMarkerStyle(20); P_true.SetMarkerColor( ROOT.kRed);  P_all.Add(P_true)
+    P_fals.SetMarkerStyle(24); P_fals.SetMarkerColor(ROOT.kBlue);  P_all.Add(P_fals)
+    P_all.Draw('AP'); 
+    P_all.GetXaxis().SetLabelOffset(0.03); P_all.GetXaxis().SetTimeDisplay(1); 
+    P_all.GetXaxis().SetTimeFormat('#splitline{%b %d}{%H:%M}%F1970-01-01 00:00:00'); 
+    P_all.GetYaxis().SetTitle('PB-5 [Volts] for %.1f keV energy' % energy)
+    P_all.GetYaxis().SetDecimals()
+    self.cv.Modified(); self.cv.Update()
+    raw_input('Have a look, then press <Enter> to exit.')
+    
+
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 """

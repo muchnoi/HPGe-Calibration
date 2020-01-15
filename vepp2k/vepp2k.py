@@ -42,6 +42,7 @@ class EDGE(Constants):
     self.Asymme  = cfg.getboolean('edge', 'Asymmetry')
     self.EdgeP2  = cfg.getboolean('edge', 'EdgePoly2')
     self.SaveDB  = cfg.getboolean('edge', 'SaveForSND') and sql
+    self.negate  = cfg.getboolean('edge', 'NegativeCV')
 
     lwave        = cfg.getfloat(  'edge', 'WaveLength')     # laser wavelength [m]
     Constants.wo = Constants.h*Constants.c/lwave            # laser photon energy [eV]
@@ -54,11 +55,11 @@ class EDGE(Constants):
 
     self.cc      = ROOT.TCanvas('cc','BEMS for VEPP-2000', 800, 600, 800, 600)
     self.const   = ROOT.TF1('const', '[0]')
-    self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7 ); self.simple.SetLineColor(ROOT.kRed)
+    self.simple  = ROOT.TF1('simple', EdgeSimple(), 0, 1, 7 );     self.simple.SetLineColor(ROOT.kRed)
     self.spreso  = ROOT.TF1('spreso', HPGeSpread(), 0, 1, 3 );
 
-    self.convol = ROOT.TF1Convolution('simple', 'spreso'); self.convol.SetNofPointsFFT(1000)
-    self.comple = ROOT.TF1('comple', self.convol, 1.0, 2.0, 10);    self.comple.SetNpx(1000)
+    self.convol  = ROOT.TF1Convolution('simple', 'spreso', -1, 1); self.convol.SetNofPointsFFT(1000)
+    self.comple  = ROOT.TF1('comple', self.convol, 1.0, 2.0, 10);  self.comple.SetNpx(1000)
 
     self.Legend  = ROOT.TLegend(0.6, 0.6, 0.95, 0.95, '', 'brNDC');
     self.HPGe    = Scale(scalefile, cfg_file, 'application')
@@ -105,18 +106,20 @@ class EDGE(Constants):
     if gain:
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
+
+
       # get rid of spikes:
       self.EP.append(565)
-#      self.EP.append(820)
-#      self.EP.append(852)
       for spike in self.EP:
         lo = 1 + int((spike - zero - 4 * self.RL)/(gain*float(self.Merger)))
         hi = 1 + int((spike - zero + 5 * self.RR)/(gain*float(self.Merger)))
         for ch in range(lo, hi): self.hps.SetBinContent(ch, 0.0); self.hps.SetBinError(ch, 0.0)
 
       Wmax = self.fitEdgeSimple(Wmax, self.Ranger)
+      self.NicePicture()
       if Wmax:
         Results = self.fitEdgeComple(Wmax, self.Ranger)
+        self.comple.Draw('SAME');  self.hps.Draw('SAME'); self.cc.Modified(); self.cc.Update()
         if Results:
           self.plots.AddPoint(         UTB, UTE, Results)
           if self.SaveDB: Save_for_SND(UTB, UTE, Results)
@@ -132,9 +135,30 @@ class EDGE(Constants):
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def NicePicture(self):
+      if self.negate:
+        self.cc.SetFillColor(923);            self.cc.SetFrameFillColor(1);          self.cc.SetFrameLineColor(0)
+        self.hps.SetMarkerColor(0);           self.hps.SetLineColor(0)
+        self.hps.GetXaxis().SetAxisColor(0);  self.hps.GetXaxis().SetTitleColor(0);  self.hps.GetXaxis().SetLabelColor(0)
+        self.hps.GetYaxis().SetAxisColor(0);  self.hps.GetYaxis().SetTitleColor(0);  self.hps.GetYaxis().SetLabelColor(0)
+        self.Legend.SetFillColor(923);        self.Legend.SetLineColor(0);           self.Legend.SetTextColor(0)
+      
+      self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
+      self.hps.Draw(''); self.simple.Draw('SAME'); 
+      self.cc.Modified(); self.cc.Update()
+
+      if self.negate:
+        self.cc.FindObject('title').SetFillColor(923)
+        self.cc.FindObject('title').SetTextColor(0)
+      self.cc.Modified(); self.cc.Update()
+#      self.cc.ls()
+#      raw_input()
+
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeSimple(self,W,LBK):
 
     K = 2.e+3*W/Constants.me; Wmin = W/(1+K); E1, E2 = W - LBK*Wmin, W + LBK*Wmin
+    self.hps.GetXaxis().SetRangeUser(E1-10, E2+10)
     self.const.SetRange(1.02*W, E2); self.hps.Fit('const','QRN');  B = self.const.GetParameter(0)
     self.const.SetRange(E1, 0.98*W); self.hps.Fit('const','QRN');  A = self.const.GetParameter(0) - B
     # Eb [MeV] | B [T] | Amplitude | Edge linear | Edge square | Background | Backg. Slope |
@@ -161,20 +185,12 @@ class EDGE(Constants):
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
       print ' ║         χ²/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (R.Chi2(), R.Ndf(), R.Prob())
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
-      OK = (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5)
       self.Legend.Clear();
-      self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()))
-    else: OK = False
-
-    self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
-    self.hps.Draw(''); self.simple.Draw('SAME'); self.hps.GetXaxis().SetRangeUser(E1-10, E2+10)
-    self.cc.Modified(); self.cc.Update()
-
-    if OK:
-      k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
-      return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
-    else:
-      print 'Simple fit: bad fit, bad amplitude, spread or χ²';  return 0.0
+      self.Legend.AddEntry(self.simple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (R.Chi2(), R.Ndf(), R.Prob()), 'l')
+      if (E['p'][2]>self.MinAmp) and (E['e'][2]/E['p'][2]<0.5):
+        k    = 4.e+6*E['p'][0]*Constants.wo/Constants.me**2; # [eV*eV / eV**2]
+        return 1.e+3*E['p'][0]*k/(1.+k)                      # Wmax [keV]
+    print 'Simple fit: bad fit, bad amplitude, spread or χ²';  return 0.0
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitEdgeComple(self, W, LBK):
@@ -191,7 +207,7 @@ class EDGE(Constants):
       comple.FixParameter(7, self.RR)
       comple.FixParameter(8, self.RL)
       comple.SetParLimits(9,0.1,100.0)
-      R = H.Fit('comple','RSQN')
+      R = H.Fit('comple','RSN')
       if self.Radius: comple.ReleaseParameter(1)
       if not self.EdgeP2: comple.ReleaseParameter(4)
       comple.ReleaseParameter(7);       comple.ReleaseParameter(8)
@@ -219,6 +235,7 @@ class EDGE(Constants):
       BF, dBF  = pV[1], pE[1]                                                          # Bending Field [T]
       BS, dBS  = pV[9]*deriv,  pE[9]*deriv                                             # Beam Spread [MeV]
       BR       = 1.e+8*pV[0]/Constants.c/BF;   dBR = BR * ((dBE/BE)**2 + (dBF/BF)**2)**0.5 # Beam Radius [cm]
+      print ' '
       print ' ╔ Convolution Fit: ═════════════╤══════════════════════╤═════════════════════════╗'
       print ' ║ Range from %5.0f to %5.0f keV │ σR = %4.2f ± %4.2f keV │ σL = %5.2f ± %5.2f keV  ║' % (E1, E2, self.RR, self.dRR, self.RL, self.dRL)
       print ' ╟───────────────────────────────┴────────┬─────────────┴─────────────────────────╢'
@@ -228,17 +245,17 @@ class EDGE(Constants):
       print ' ╟────────────────────────────────────────┼───────────────────────────────────────╢'
       print ' ║         χ²/NDF = %5.1f/%3d             │         Probability: %8.6f         ║' % (chi2, ndf, prob)
       print ' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n'
-      OK = (pE[0]/pV[0]<0.001) and prob>0.01
-      self.Legend.AddEntry(self.comple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (chi2, ndf, prob))
-      self.Legend.AddEntry(self.comple, 'E_{beam} = %8.3f #pm %5.3f [MeV]'   % (BE, dBE), 'l')
-      self.Legend.AddEntry(self.comple, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), 'l')
-      self.Legend.AddEntry(self.comple, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), 'l')
+      self.Legend.AddEntry(self.comple, '#chi^{2}/NDF = %5.1f/%3d  (Prob: %5.3f)' % (chi2, ndf, prob), 'l')
+      self.Legend.AddEntry(0, 'E_{beam} = %8.3f #pm %5.3f [MeV]'   % (BE, dBE), '')
+      self.Legend.AddEntry(0, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), '')
+      self.Legend.AddEntry(0, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), '')
       self.Legend.Draw('SAME')
-    else: OK = False
-    self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
-
-    if OK: return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}
-    else:  print 'Complex fit: bad fit, bad amplitude, spread or χ²', status;  return False
+      if (pE[0]/pV[0]<0.001) and prob>0.001:
+        return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}        
+    else:
+      print 'Status: %d (χ²/NDF = %5.1f/%3d - probability: %8.6f)' % (status, chi2, ndf, prob)
+    print 'Convolution fit: bad fit (status %d), bad amplitude, spread or χ²' % status  
+    return False
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

@@ -14,7 +14,7 @@ def Usage():
  ║ -k,          --keV                : use channels not keV.                      ║
  ║ -l,          --list               : just show the list of files.               ║
  ║              --toi                : show the table of known isotopes.          ║
- ║ -f expr,     --file = expr        : file name(s) under specified folder(s).    ║
+ ║ -f expr,     --file = expr        : filename(s) under specified folder(s).     ║
  ║ -n N,        --nf   = N           : put several files into one spectrum.       ║
  ║ -d YYYYMMDD, --folder  = YYYYMMDD : date to start from (year, month, day).     ║
  ║ -e YYYYMMDD, --efolder = YYYYMMDD : date to  end  with (year, month, day).     ║
@@ -22,15 +22,16 @@ def Usage():
  ║ -c filename, --cfg     = filename : file to read various parameters,           ║
  ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
- ║                                     otherwise "escale.root" is used.           ║
+ ║                                     otherwise "escale.pickle" is used.         ║
  ║ -j,          --joint              : show joint calibration results.            ║
  ║ -v energy,   --verify  = energy   : calibration results for an energy [keV].   ║
- ║              --edge               : try to measure beam energy by Compton edge.║
- ║              --escan              : deal with beam energy scan experiment.     ║
- ║ -g       ,   --generate           : generate subfolders with 'success.list'    ║
+ ║              --bncpb5  = energy   : check volt-to-keV conversion koefficients. ║
+ ║ -g,          --generate           : generate subfolders with 'success.list'    ║
  ║                                     and 'failure.list' file containers.        ║
  ║ -p folder,   --point   = folder   : subfolder under the working folder,        ║
  ║                                     where there is the 'success.list' file.    ║
+ ║              --edge               : try to get beam energy from Compton edge.  ║
+ ║              --escan              : deal with beam energy scan experiment.     ║
  ╚════════════════════════════════════════════════════════════════════════════════╝
  ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
 
@@ -55,6 +56,7 @@ else:
   ROOT.gStyle.SetTitleBorderSize(0)
   ROOT.gStyle.SetOptStat(0)
   ROOT.gStyle.SetOptFit(0)
+  
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class ToDo:
@@ -79,15 +81,15 @@ class ToDo:
     self.filename  = self.lastfile = ''
     self.tokeV     = self.online   = True
     self.point     = './'
-    self.prompt    = self.listonly = self.edge = self.escan = self.verify = self.generate = self.examine = False
+    self.prompt    = self.listonly = self.edge = self.escan = self.verify = self.generate = self.examine = self.VtokeV = False
     self.cfg_file  = 'online.cfg'
-    self.scalefile = 'escale.root'
+    self.scalefile = 'escale.pickle'
     self.Options(sys.argv)
 
   def Options(self,argv):
     S = D = E = False
     sopt = "c:d:e:f:n:p:s:t:v:ghijkl"
-    lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=",
+    lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=", "bncpb5=", 
             "generate", "interactive", "joint", "help", "keV", "list", "edge", "escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
@@ -104,6 +106,7 @@ class ToDo:
       elif opt in ("-k", "--keV")        : self.tokeV     = False
       elif opt in ("-s", "--scale")      : self.scalefile = arg;                           S = True
       elif opt in ("-j", "--joint")      : self.examine   = True;     self.online = False
+      elif opt in (      "--bncpb5")     : self.VtokeV    = True;     self.online = False; self.energy = float(arg)
       elif opt in ("-v", "--verify")     : self.verify    = True;     self.online = False; self.energy = float(arg)
       elif opt in ("-l", "--list")       : self.listonly  = True;
       elif opt in (      "--edge")       : self.edge      = True;                          self.tokeV  = False
@@ -117,7 +120,7 @@ class ToDo:
     if not self.online:
       if cfg.has_option('scan', 'bdate') and not D:  self.folder = cfg.get(   'scan', 'bdate')
       if cfg.has_option('scan', 'edate') and not E: self.efolder = cfg.get(   'scan', 'edate')
-      if cfg.has_option('scan', 'tgap'):           self.tgap     = cfg.getint('scan', 'tgap')
+      if cfg.has_option('scan', 'tgap'):            self.tgap    = cfg.getint('scan', 'tgap')
 
   def GetList(self):
     if self.point != './':
@@ -219,11 +222,11 @@ class Histogram:
 
       H,S = divmod(self.LiveT, 3600); M,S = divmod(S, 60)
 
-      if   len([f for f in filechain if 'elec' in f]) == len(filechain): ptype = 'electron'
-      elif len([f for f in filechain if 'posi' in f]) == len(filechain): ptype = 'positron'
-      else:                                                              ptype = 'porridge'
+      if   len([f for f in filechain if 'elec' in f]) == len(filechain): ptype = 'electron: '
+      elif len([f for f in filechain if 'posi' in f]) == len(filechain): ptype = 'positron: '
+      else:                                                              ptype = ''
 
-      self.sname  = ptype + ': '
+      self.sname  = ptype
       self.sname += time.strftime('%Y.%m.%d [%H:%M:%S -', time.localtime(self.UTB))
       self.sname += time.strftime(' %H:%M:%S] %Y.%m.%d.', time.localtime(self.UTE))
       self.sname += ' Live-time: %d hours %d min %d s (%d files).' % (H, M, S, n)
@@ -321,6 +324,10 @@ def main(argv):
       from scale.scale import Scale
       A = Scale(todo.scalefile, todo.cfg_file, 'verification')
       A.Check_Resolution_Model()
+    elif todo.VtokeV:
+      from scale.scale import Scale
+      A = Scale(todo.scalefile, todo.cfg_file, 'verification')
+      A.Check_Pulser(todo.energy)
     else:
       A = Histogram(todo)
       while True:

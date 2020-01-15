@@ -16,7 +16,8 @@ double airy_ai_int(const double *xx, const double *)
   static const double xmax  =  6.00;
   static const double xstep =  0.05;
 
-  static std::auto_ptr<RM::Interpolator> spline;
+/*  static std::auto_ptr<RM::Interpolator> spline; */ /* Changed 2019.11.01 by N. Yu. Muchnoi */
+  static std::unique_ptr<RM::Interpolator> spline;
   if( !spline.get() ) {
     const RM::WrappedFunction<> wrapped(&RM::airy_Ai);
 

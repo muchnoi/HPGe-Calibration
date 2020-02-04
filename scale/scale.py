@@ -147,8 +147,10 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
             if abs(x - line['W']) < self.erec:
               name = "%5s(%4s)" % (nucl, lines.index(line))
               V = {'name':name, 'E':line['W'], 'dE':line['dW'] + self.tbpa, 'X':x, 'A':A, 'B':B}
-              if name in self.scale: self.ScalePeaks.append(V)
-              else:                  self.OtherPeaks.append(V)
+              C1 = name in self.scale                                # Is this a calibration line ?
+              C2 = name not in [e['name'] for e in self.ScalePeaks]  # Haven't we found it yet?
+              if C1 and C2: self.ScalePeaks.append(V)
+              else:         self.OtherPeaks.append(V)
               break
             else: continue
           if name: break
@@ -168,7 +170,6 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.PulsePeaks = [el for el in self.PulsePeaks if el.has_key('A')]
       self.PulsePeaks.sort(key = lambda p: p['E'])
     if len(self.PulsePeaks) < 4 : self.PB5=False
-
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def fitPeaks(self, L = 2.0, R = 2.0):

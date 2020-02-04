@@ -1,1 +1,1 @@
-__all__ = ["atlas","isotopes"]
+__all__ = ["atlas","scale"]

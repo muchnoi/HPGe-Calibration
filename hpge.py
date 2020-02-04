@@ -18,7 +18,7 @@ def Usage():
  ║ -n N,        --nf   = N           : put several files into one spectrum.       ║
  ║ -d YYYYMMDD, --folder  = YYYYMMDD : date to start from (year, month, day).     ║
  ║ -e YYYYMMDD, --efolder = YYYYMMDD : date to  end  with (year, month, day).     ║
- ║ -t HHMMSS,   --time    = HHMMSS   : time from which to start (hour, min, sec). ║
+ ║              --time    = HHMMSS   : time from which to start (hour, min, sec). ║
  ║ -c filename, --cfg     = filename : file to read various parameters,           ║
  ║                                     otherwise "online.cfg" is used.            ║
  ║ -s filename, --scale   = filename : file to store/get calibration results,     ║
@@ -56,7 +56,7 @@ else:
   ROOT.gStyle.SetTitleBorderSize(0)
   ROOT.gStyle.SetOptStat(0)
   ROOT.gStyle.SetOptFit(0)
-  
+
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class ToDo:
@@ -88,8 +88,8 @@ class ToDo:
 
   def Options(self,argv):
     S = D = E = False
-    sopt = "c:d:e:f:n:p:s:t:v:ghijkl"
-    lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=", "bncpb5=", 
+    sopt = "c:d:e:f:n:p:s:v:ghijkl"
+    lopt = ["cfg=", "folder=", "efolder=", "file=", "time=", "nfiles=", "scale=", "verify=", "point=", "bncpb5=",
             "generate", "interactive", "joint", "help", "keV", "list", "edge", "escan"]
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
@@ -102,7 +102,7 @@ class ToDo:
       elif opt in ("-d", "--folder")     : self.folder    = arg;      self.online = False; D = True
       elif opt in ("-e", "--efolder")    : self.efolder   = arg;      self.online = False; E = True
       elif opt in ("-f", "--file")       : self.filename  = arg;      self.online = False
-      elif opt in ("-t", "--time")       : self.tfrom     = int(arg); self.online = False
+      elif opt in (      "--time")       : self.tfrom     = int(arg); self.online = False
       elif opt in ("-k", "--keV")        : self.tokeV     = False
       elif opt in ("-s", "--scale")      : self.scalefile = arg;                           S = True
       elif opt in ("-j", "--joint")      : self.examine   = True;     self.online = False

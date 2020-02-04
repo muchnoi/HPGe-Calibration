@@ -102,14 +102,13 @@ class EDGE(Constants):
     Wmax = 1.e+3*self.Eo*k/(1.+k)                                               # [keV]
     print "Fit initial beam energy: %7.2f MeV " % self.Eo
     zero, gain = self.GetCalibrationResults(0.5*(UTB+UTE), Wmax)
-
     if gain:
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
 
 
       # get rid of spikes:
-      self.EP.append(565)
+#      self.EP.append(565)
       for spike in self.EP:
         lo = 1 + int((spike - zero - 4 * self.RL)/(gain*float(self.Merger)))
         hi = 1 + int((spike - zero + 5 * self.RR)/(gain*float(self.Merger)))
@@ -142,9 +141,9 @@ class EDGE(Constants):
         self.hps.GetXaxis().SetAxisColor(0);  self.hps.GetXaxis().SetTitleColor(0);  self.hps.GetXaxis().SetLabelColor(0)
         self.hps.GetYaxis().SetAxisColor(0);  self.hps.GetYaxis().SetTitleColor(0);  self.hps.GetYaxis().SetLabelColor(0)
         self.Legend.SetFillColor(923);        self.Legend.SetLineColor(0);           self.Legend.SetTextColor(0)
-      
+
       self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
-      self.hps.Draw(''); self.simple.Draw('SAME'); 
+      self.hps.Draw(''); self.simple.Draw('SAME');
       self.cc.Modified(); self.cc.Update()
 
       if self.negate:
@@ -251,10 +250,10 @@ class EDGE(Constants):
       self.Legend.AddEntry(0, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), '')
       self.Legend.Draw('SAME')
       if (pE[0]/pV[0]<0.001) and prob>0.001:
-        return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}        
+        return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}
     else:
       print 'Status: %d (χ²/NDF = %5.1f/%3d - probability: %8.6f)' % (status, chi2, ndf, prob)
-    print 'Convolution fit: bad fit (status %d), bad amplitude, spread or χ²' % status  
+    print 'Convolution fit: bad fit (status %d), bad amplitude, spread or χ²' % status
     return False
 
 
@@ -265,6 +264,8 @@ class EDGE(Constants):
       L = len(Scale['R'])
       if L: break
       else: print 'Waiting 10s for calibration results...';   time.sleep(10)
+
+
     if L == 1: c = 0
     elif L >1:
       Q = [Scale['dW'][c] * Scale['dC'][c] * Scale['dR'][c] * Scale['dL'][c] for c in range(L)]
@@ -272,7 +273,9 @@ class EDGE(Constants):
       if len(Q)==0:    print 'No valid calibration was found'; return 0, 0
       c = Q.index(min(Q))
     else:              print 'No valid calibration was found'; return 0, 0
+
     zero, gain         = Scale['Z'][c], Scale['G' ][c]
+
     self.dW            =                Scale['dW'][c] # linear calibration statistical error, keV
     self.SC, self.dSC  = Scale['C'][c], Scale['dC'][c] # PB-5  scale correction and its error, keV
     self.RR, self.dRR  = Scale['R'][c], Scale['dR'][c] # Right resolution sigma and its error, keV
@@ -466,7 +469,7 @@ class EMSResults:
       self.BE.GetPoint(p,t,e); de = self.BE.GetErrorY(p)
       self.BS.GetPoint(p,t,s); ds = self.BS.GetErrorY(p)
       self.BC.GetPoint(p,t,i); di = self.BC.GetErrorY(p)
-      if abs(di/i)<0.5 and abs(ds/s)<0.5:
+      if (i>0.0) and (s>0.0) and abs(di/i)<0.5 and abs(ds/s)<0.5:
         S, dS = 10.*s/e, 10.*ds/e
         self.SI.Fill(i,S,1./dS**2)
         xmin = min(xmin, i-di);  xmax = max(xmax, i+di)
@@ -566,5 +569,4 @@ def fitParameters(fitf):
     p.append(fitf.GetParameter(i))
     e.append(fitf.GetParError(i))
   return {'p':p,'e':e}
-
 

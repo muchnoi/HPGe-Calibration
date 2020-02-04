@@ -3,42 +3,33 @@ class Atlas:
     self.me = 510.998910  # electron rest mass, keV
     self.atlas={}
 
+    self.atlas['Cs137']   =   [{'W': 661.657, 'dW':.003 }]
+    self.atlas['Co60 ']   =   [{'W':1173.228, 'dW':.003 }]
+    self.atlas['Co60 '].append({'W':1332.492, 'dW':.004 })
+
     self.atlas['  H1 ']   =   [{'W':2223.250, 'dW':.050 }]
     self.atlas[' K40 ']   =   [{'W':1460.750, 'dW':.060 }]
     self.atlas['annig']   =   [{'W': 510.998, 'dW':.060 }]
 
     self.atlas[' O16 ']   =   [{'W':6129.075, 'dW':.050 }]
-#    self.atlas[' O16 ']   =   [{'W':6128.630, 'dW':.040  }]
-#    self.atlas['Ale81']   =   [{'W':6129.240, 'dW':.050  }]
-#    self.atlas['She82']   =   [{'W':6129.142, 'dW':.032  }]
-#    self.atlas['Ken86']   =   [{'W':6129.119, 'dW':.040  }]
 
-    self.atlas['Cs137']   =   [{'W': 661.657, 'dW':.003 }]
-
-    self.atlas['Co60 ']   =   [{'W':1173.228, 'dW':.003 }]
-    self.atlas['Co60 '].append({'W':1332.492, 'dW':.004 })
+    """
+    self.atlas[' O16 ']   =   [{'W':6128.630, 'dW':.040  }]
+    self.atlas['Ale81']   =   [{'W':6129.240, 'dW':.050  }]
+    self.atlas['She82']   =   [{'W':6129.142, 'dW':.032  }]
+    self.atlas['Ken86']   =   [{'W':6129.119, 'dW':.040  }]
 
     self.atlas['Na24 ']   =   [{'W':1368.625, 'dW':.005 }]
     self.atlas['Na24 '].append({'W':2754.008, 'dW':.011 })
     self.atlas['Na24 '].append({'W':3866.190, 'dW':.011 })
-
     self.atlas['Al28 ']   =   [{'W':1778.969, 'dW':.012 }]
-
-#    self.atlas['Tl208']   =   [{'W': 238.600, 'dW':.100 }]
-#    self.atlas['Tl208'].append({'W': 241.000, 'dW':.100 })
-#    self.atlas['Tl208'].append({'W': 277.400, 'dW':.100 })
-
 
     self.atlas['Co56 ']   =   [{'W': 846.764, 'dW':.020 }]
     self.atlas['Co56 '].append({'W':1238.274, 'dW':.020 })
 
     self.atlas['Mn56 ']   =   [{'W': 846.764, 'dW':.020 }]
     self.atlas['Mn56 '].append({'W':1810.726, 'dW':.040 })
-
-
-#    self.atlas['Pb212'] = []
-#    self.atlas['Pb212'].append({'W': 238.632, 'dW':.002, 'I':43.3, 'dI':0.40 })
-#    self.atlas['Pb212'].append({'W': 300.087, 'dW':.010, 'I':3.28, 'dI':0.30 })
+    """
 
     self.atlas['In116'] = []
     self.atlas['In116'].append({'W': 416.860, 'dW':.030, 'I':27.7, 'dI':.120 })
@@ -48,6 +39,7 @@ class Atlas:
     self.atlas['In116'].append({'W':1507.670, 'dW':.040, 'I':10.0, 'dI':.030 })
     self.atlas['In116'].append({'W':2112.312, 'dW':.022, 'I':15.5, 'dI':.040 })
 
+    """
     self.atlas['FePNG'] = []
     self.atlas['FePNG'].append({'W': 139.750, 'dW':.030, 'I':.005, 'dI':.001 })
     self.atlas['FePNG'].append({'W': 198.380, 'dW':.030, 'I':.005, 'dI':.001 })
@@ -62,7 +54,7 @@ class Atlas:
     self.atlas['FePNG'].append({'W':7278.830, 'dW':.100, 'I':.137, 'dI':.001 })
     self.atlas['FePNG'].append({'W':7631.050, 'dW':.090, 'I':.653, 'dI':.001 })
     self.atlas['FePNG'].append({'W':7645.480, 'dW':.090, 'I':.549, 'dI':.001 })
-
+    """
 # 232-Th decay chain
 
     self.atlas['Ac228'] = []
@@ -79,30 +71,28 @@ class Atlas:
     self.atlas['Tl208'].append({'W': 583.187, 'dW':.005, 'I':.85100, 'dI':.00900 })
     self.atlas['Tl208'].append({'W': 860.560, 'dW':.030, 'I':.12600, 'dI':.00200 })
     self.atlas['Tl208'].append({'W':2614.511, 'dW':.010, 'I':.99900, 'dI':.00400 })
-#    self.atlas['Tl208'].append({'W': 211.400, 'dW':.150, 'I':.00018, 'dI':.00001 })
-#    self.atlas['Tl208'].append({'W': 233.360, 'dW':.150, 'I':.00290, 'dI':.00030 })
-#    self.atlas['Tl208'].append({'W': 252.610, 'dW':.100, 'I':.00780, 'dI':.00030 })
-#    self.atlas['Tl208'].append({'W': 277.358, 'dW':.010, 'I':.06370, 'dI':.00120 })
-#    self.atlas['Tl208'].append({'W': 485.950, 'dW':.150, 'I':.00047, 'dI':.00006 })
-#    self.atlas['Tl208'].append({'W': 510.770, 'dW':.100, 'I':.22500, 'dI':.00500 })
-#    self.atlas['Tl208'].append({'W': 587.700, 'dW':.300, 'I':.00042, 'dI':.00017 })
-#    self.atlas['Tl208'].append({'W': 650.100, 'dW':.300, 'I':.00036, 'dI':.00006 })
-#    self.atlas['Tl208'].append({'W': 705.200, 'dW':.300, 'I':.00022, 'dI':.00006 })
-#    self.atlas['Tl208'].append({'W': 722.040, 'dW':.120, 'I':.00240, 'dI':.00020 })
-#    self.atlas['Tl208'].append({'W': 748.700, 'dW':.200, 'I':.00045, 'dI':.00003 })
-#    self.atlas['Tl208'].append({'W': 763.130, 'dW':.080, 'I':.01780, 'dI':.00060 })
-#    self.atlas['Tl208'].append({'W': 821.200, 'dW':.200, 'I':.00042, 'dI':.00003 })
-#    self.atlas['Tl208'].append({'W': 883.300, 'dW':.200, 'I':.00031, 'dI':.00003 })
-#    self.atlas['Tl208'].append({'W': 927.600, 'dW':.200, 'I':.00128, 'dI':.00020 })
-#    self.atlas['Tl208'].append({'W': 982.700, 'dW':.200, 'I':.00190, 'dI':.00020 })
-#    self.atlas['Tl208'].append({'W':1093.900, 'dW':.200, 'I':.00420, 'dI':.00030 })
-#    self.atlas['Tl208'].append({'W':1160.800, 'dW':.300, 'I':.00011, 'dI':.00003 })
-#    self.atlas['Tl208'].append({'W':1185.200, 'dW':.300, 'I':.00017, 'dI':.00006 })
-#    self.atlas['Tl208'].append({'W':1282.800, 'dW':.300, 'I':.00050, 'dI':.00006 })
-
-
-
-
+    """
+    self.atlas['Tl208'].append({'W': 211.400, 'dW':.150, 'I':.00018, 'dI':.00001 })
+    self.atlas['Tl208'].append({'W': 233.360, 'dW':.150, 'I':.00290, 'dI':.00030 })
+    self.atlas['Tl208'].append({'W': 252.610, 'dW':.100, 'I':.00780, 'dI':.00030 })
+    self.atlas['Tl208'].append({'W': 277.358, 'dW':.010, 'I':.06370, 'dI':.00120 })
+    self.atlas['Tl208'].append({'W': 485.950, 'dW':.150, 'I':.00047, 'dI':.00006 })
+    self.atlas['Tl208'].append({'W': 510.770, 'dW':.100, 'I':.22500, 'dI':.00500 })
+    self.atlas['Tl208'].append({'W': 587.700, 'dW':.300, 'I':.00042, 'dI':.00017 })
+    self.atlas['Tl208'].append({'W': 650.100, 'dW':.300, 'I':.00036, 'dI':.00006 })
+    self.atlas['Tl208'].append({'W': 705.200, 'dW':.300, 'I':.00022, 'dI':.00006 })
+    self.atlas['Tl208'].append({'W': 722.040, 'dW':.120, 'I':.00240, 'dI':.00020 })
+    self.atlas['Tl208'].append({'W': 748.700, 'dW':.200, 'I':.00045, 'dI':.00003 })
+    self.atlas['Tl208'].append({'W': 763.130, 'dW':.080, 'I':.01780, 'dI':.00060 })
+    self.atlas['Tl208'].append({'W': 821.200, 'dW':.200, 'I':.00042, 'dI':.00003 })
+    self.atlas['Tl208'].append({'W': 883.300, 'dW':.200, 'I':.00031, 'dI':.00003 })
+    self.atlas['Tl208'].append({'W': 927.600, 'dW':.200, 'I':.00128, 'dI':.00020 })
+    self.atlas['Tl208'].append({'W': 982.700, 'dW':.200, 'I':.00190, 'dI':.00020 })
+    self.atlas['Tl208'].append({'W':1093.900, 'dW':.200, 'I':.00420, 'dI':.00030 })
+    self.atlas['Tl208'].append({'W':1160.800, 'dW':.300, 'I':.00011, 'dI':.00003 })
+    self.atlas['Tl208'].append({'W':1185.200, 'dW':.300, 'I':.00017, 'dI':.00006 })
+    self.atlas['Tl208'].append({'W':1282.800, 'dW':.300, 'I':.00050, 'dI':.00006 })
+    """
 
     """
     for nucl, lines in self.atlas.iteritems():
@@ -133,6 +123,4 @@ class Atlas:
 
   def __del__(self):
     del self.atlas
-
-
 

@@ -69,10 +69,10 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def __del__(self):
     Atlas.__del__(self);
-    try: 
+    try:
       self.cv.cd(); self.cv.Clear()
     except AttributeError:
-      pass  
+      pass
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Do(self, utb, ute, pb5, hps, ptype):
@@ -450,7 +450,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       sa = '%5.1f / %1d'   % (self.linear_scale_fit_result.Chi2(),       self.linear_scale_fit_result.Ndf()     )
       if self.spline:
         sb = '%5.2f / %1d' % (self.pulser_correction_fit_result.Chi2(),  self.pulser_correction_fit_result.Ndf())
-      else: 
+      else:
         sb = 'none/nan'
       print ' ║ linear fit:         χ²/NDF = %9s │ pulser fit:        χ²/NDF = %9s ║' % (sa, sb)
     print ' ║ Zero = %5.3f keV, Gain = %6.4f keV/ch │ Zero = %5.2f keV, Gain = %6.2f keV/V ║' % (self.zero, self.gain, self.zero_p, self.gain_p)
@@ -577,20 +577,20 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
   def Check_Resolution_Model(self):
     from numpy import asarray
     ROOT.gStyle.SetOptFit(1111)
-    
+
     def Weighted_Averages(D):
       S0, S1, S2 = 0.0, 0.0, 0.0
       for [v, s] in D:
         w = 1.0 if not s else 1.0/s**2
         S0 += v*w; S1 += v*v*w; S2 += w
       return S0/S2, (S1/S2 - (S0/S2)**2)**0.5
-      
-    d = [] 
+
+    d = []
     with open(self.outfile,'rb') as fp:
       while True:
         try:   d.append(cPickle.load(fp))
         except EOFError: break
-    
+
     hs = ROOT.TH1I('hs','', 20, 0., 20.)
     fs = ROOT.TF1( 'fs', '[0]*ROOT::Math::chisquared_pdf(x,[1])', 0., 20.)
     hr = ROOT.TH1I('hr','', 20, 0., 40.)
@@ -598,7 +598,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     D = {}
     ScPks = {}
     n, ndfs, ndfr = 0.0, 0.0, 0.0
-    for p in d[0]['peaks'][0]: 
+    for p in d[0]['peaks'][0]:
       D[p['E']] = {'R':[], 'L':[], 'K':[]}
       ScPks[p['E']] = {'name':p['name'], 'Chi2':[], 'Ndf':[]}
     for rec in d:
@@ -634,18 +634,18 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     fR = ROOT.TF1('fR', 'sqrt([0]**2 + [1]*2.96e-3*x)')
     fL = ROOT.TF1('fL', 'sqrt([0]**2 + [1]*2.96e-3*x)')
     gK.SetNameTitle('', 'f(x) = ' + self.expt)
-    self.cv.Clear();  self.cv.Divide(2, 2) 
-    self.cv.cd(1);    self.cv.GetPad(1).SetGrid() 
+    self.cv.Clear();  self.cv.Divide(2, 2)
+    self.cv.cd(1);    self.cv.GetPad(1).SetGrid()
     gL.Draw('AP');    gL.Fit('fL');  gL.GetYaxis().SetTitle('#sigma_{L} [keV]')
     gR.Draw('PSAME'); gR.Fit('fR');  gR.GetYaxis().SetTitle('#sigma_{R} [keV]'); gR.GetXaxis().SetTitle('keV')
-    self.cv.cd(2);    self.cv.GetPad(2).SetGrid() 
+    self.cv.cd(2);    self.cv.GetPad(2).SetGrid()
     gK.Draw('AP');                   gK.GetYaxis().SetTitle('#kappa [a.u.]');  gK.GetXaxis().SetTitle('keV')
     if self.exp0 == 0.0:  gK.Fit('kapp')
     else:                 self.kapp.Draw('SAME')
     self.cv.cd(3);    self.cv.GetPad(3).SetGrid();    hs.Draw('HIST'); fs.Draw('SAME')
     self.cv.cd(4);    self.cv.GetPad(4).SetGrid();    hr.Draw('HIST'); fr.Draw('SAME')
     self.cv.Modified(); self.cv.Update()
-    
+
     n, plt = 0, {'C':[], 'H':[], 'F':[]}
     for e,t in ScPks.iteritems():
       plt['C'].append(ROOT.TCanvas(str(e), ScPks[e]['name'], n*10+10, n*10+10, 400, 400))
@@ -725,7 +725,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Check_Pulser(self, energy):
     from numpy import asarray
-    d = [] 
+    d = []
     with open(self.outfile,'rb') as fp:
       while True:
         try:   d.append(cPickle.load(fp))
@@ -742,14 +742,14 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.cv.cd();              self.cv.SetTitle('Pulser Check');   self.cv.SetGrid()
     P_true.SetMarkerStyle(20); P_true.SetMarkerColor( ROOT.kRed);  P_all.Add(P_true)
     P_fals.SetMarkerStyle(24); P_fals.SetMarkerColor(ROOT.kBlue);  P_all.Add(P_fals)
-    P_all.Draw('AP'); 
-    P_all.GetXaxis().SetLabelOffset(0.03); P_all.GetXaxis().SetTimeDisplay(1); 
-    P_all.GetXaxis().SetTimeFormat('#splitline{%b %d}{%H:%M}%F1970-01-01 00:00:00'); 
+    P_all.Draw('AP');
+    P_all.GetXaxis().SetLabelOffset(0.03); P_all.GetXaxis().SetTimeDisplay(1);
+    P_all.GetXaxis().SetTimeFormat('#splitline{%b %d}{%H:%M}%F1970-01-01 00:00:00');
     P_all.GetYaxis().SetTitle('PB-5 [Volts] for %.1f keV energy' % energy)
     P_all.GetYaxis().SetDecimals()
     self.cv.Modified(); self.cv.Update()
     raw_input('Have a look, then press <Enter> to exit.')
-    
+
 
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -768,7 +768,7 @@ class LineShape: # monochromatic gamma line response  # class # class # class # 
     if    X >  0.0:       f =                   ROOT.TMath.Exp(-0.5*( X/p[2])**2)
     elif  X < -p[6]*SL:   f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(p[6] * X/SL + 0.5*p[6]**2)
     else:                 f = p[4] + (1.0-p[4])*ROOT.TMath.Exp(-0.5*( X/SL)**2)
-    
+
     nr = ROOT.TMath.Exp(- 0.5*p[6]**2) / p[6]  +  self.t1 * ROOT.TMath.Erf(0.5**0.5 * p[6])
     return p[0] * f / ((1.0-p[4]) * nr * SL + p[2] * self.t1)  +  p[5]
 """
@@ -780,7 +780,7 @@ class LineShape: # monochromatic gamma line response  # class # class # class # 
   t0 = (0.5 / ROOT.TMath.Pi())**0.5
   t1 = (0.5 * ROOT.TMath.Pi())**0.5
   pp = 0.5**0.5
-  
+
   def __call__(self, x, p):
     X = x[0]-p[1]
     if p[4]==100.0: # i.e. for symmetric (pulser) peaks
@@ -795,8 +795,8 @@ class LineShape: # monochromatic gamma line response  # class # class # class # 
       return R
     except TypeError:
       print self.pp, X, p[2]
-      exit()     
-    
+      exit()
+
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
 class ResolutionModel: # Combine resolution model # class # class # class # class # class # class # class # class # class
   # P0    | P1     | P2     |
@@ -843,6 +843,4 @@ def MultiGraphLimits(mg):
       Y.append(g.GetY()[n])
       eY.append(g.GetEY()[n])
   return min(X)-100, max(X)+100, min(Y)-2*max(eY), max(Y)+2*max(eY)
-
-
 

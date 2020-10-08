@@ -83,8 +83,8 @@ class EDGE(Constants):
         return False
 
     R = VEPP2K_DB().GetRunInfo(filechain)
-#    if not R:
-#      R =  {'E':535.2, 'dE':0.1, 'I':0.0, 'dI':0.0, 'B':0.0, 'dB':0.0}
+    if not R:
+      R =  {'E':970.5, 'dE':0.1, 'I':0.0, 'dI':0.0, 'B':0.0, 'dB':0.0}
     if R:
       print ' ╔ VEPP2K conditions: ══════╤═════════════════════════╤═══════════════════════════╗'
       print ' ║  E = %7.2f ± %5.2f MeV │ Ie = %5.1f ± %5.1f mA   │  Bo = %7.5f ± %7.5f T ║' % (R['E'], R['dE'], R['I'], R['dI'], R['B'], R['dB'])
@@ -92,6 +92,7 @@ class EDGE(Constants):
       self.VEPP2K = R
       if abs(self.ETuner)<20.0:           self.Eo = self.ETuner + self.VEPP2K['E']        # [MeV]
       else:                               self.Eo = self.ETuner                           # [MeV]
+      if self.Eo<150.: return
       if self.Radius:                     self.Bo = 1.e+8*self.Eo/Constants.c/self.Radius # [T]
       elif not self.VEPP2K.has_key('B'):  self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T]
       elif self.VEPP2K['B']<0.1:          self.Bo = 1.e+8*self.Eo/Constants.c/140.0       # [T]
@@ -106,7 +107,6 @@ class EDGE(Constants):
       nbins    = hps.GetNbinsX();  hps.SetBins(nbins, zero, zero + gain * nbins)
       self.hps = hps.Clone(); self.hps.Rebin(self.Merger);  self.hps.GetXaxis().SetTitle('E_{#gamma} [keV]')
 
-
       # get rid of spikes:
 #      self.EP.append(565)
       for spike in self.EP:
@@ -118,7 +118,9 @@ class EDGE(Constants):
       self.NicePicture()
       if Wmax:
         Results = self.fitEdgeComple(Wmax, self.Ranger)
-        self.comple.Draw('SAME');  self.hps.Draw('SAME'); self.cc.Modified(); self.cc.Update()
+        self.NicePicture()
+        self.comple.Draw('SAME');      self.Legend.Draw('SAME'); self.cc.Modified(); self.cc.Update()
+        #self.hps.Draw('SAME'); self.cc.Modified(); self.cc.Update()
         if Results:
           self.plots.AddPoint(         UTB, UTE, Results)
           if self.SaveDB: Save_for_SND(UTB, UTE, Results)
@@ -137,12 +139,14 @@ class EDGE(Constants):
   def NicePicture(self):
       if self.negate:
         self.cc.SetFillColor(923);            self.cc.SetFrameFillColor(1);          self.cc.SetFrameLineColor(0)
-        self.hps.SetMarkerColor(0);           self.hps.SetLineColor(0)
+        self.hps.SetMarkerColor(ROOT.kCyan);  self.hps.SetLineColor(ROOT.kCyan)
         self.hps.GetXaxis().SetAxisColor(0);  self.hps.GetXaxis().SetTitleColor(0);  self.hps.GetXaxis().SetLabelColor(0)
         self.hps.GetYaxis().SetAxisColor(0);  self.hps.GetYaxis().SetTitleColor(0);  self.hps.GetYaxis().SetLabelColor(0)
         self.Legend.SetFillColor(923);        self.Legend.SetLineColor(0);           self.Legend.SetTextColor(0)
+        self.simple.SetLineColor(ROOT.kOrange)
+        self.comple.SetLineColor(ROOT.kPink)
 
-      self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(20)
+      self.cc.cd(); self.cc.Clear();  self.cc.SetGrid(); self.hps.SetMarkerStyle(24)
       self.hps.Draw(''); self.simple.Draw('SAME');
       self.cc.Modified(); self.cc.Update()
 
@@ -214,7 +218,7 @@ class EDGE(Constants):
 
 
     self.convol.SetRange(E1, E2);            self.comple.SetRange(C1, C2)
-    self.simple.SetLineColor(ROOT.kBlue);    self.comple.SetLineColor(ROOT.kRed);
+#    self.simple.SetLineColor(ROOT.kBlue);    self.comple.SetLineColor(ROOT.kRed);
     P = fitParameters(self.simple)['p'];     P.extend([self.RR, self.RL, 1.0])
     self.comple.SetParameters(np.fromiter(P, np.float))
     self.comple.Draw('SAME');  self.cc.Modified(); self.cc.Update()
@@ -248,7 +252,6 @@ class EDGE(Constants):
       self.Legend.AddEntry(0, 'E_{beam} = %8.3f #pm %5.3f [MeV]'   % (BE, dBE), '')
       self.Legend.AddEntry(0, '#sigma_{E} = %6.0f #pm %4.0f [keV]' % (BS, dBS), '')
       self.Legend.AddEntry(0, 'R_{beam} = %6.2f #pm %5.2f [cm]'    % (BR, dBR), '')
-      self.Legend.Draw('SAME')
       if (pE[0]/pV[0]<0.001) and prob>0.001:
         return {'BE':[BE,dBE], 'BF':[BF,dBF], 'BS':[BS,dBS], 'BC':[self.VEPP2K['I'], self.VEPP2K['dI']]}
     else:
@@ -263,7 +266,7 @@ class EDGE(Constants):
       Scale = self.HPGe.Get_Calibration(t, wmax)
       L = len(Scale['R'])
       if L: break
-      else: print 'Waiting 10s for calibration results...';   time.sleep(10)
+      else: print 'Waiting 15s for calibration results...';   time.sleep(15)
 
 
     if L == 1: c = 0

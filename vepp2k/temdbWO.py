@@ -3,7 +3,7 @@
 """
 Я завел следующие поля в базе:
 /EMS/DT /EMS/E /EMS/DE /EMS/B /EMS/DB /EMS/S /EMS/DS
-Я добавил также простой "replace" -- работать будет только если время совпадает в точности.  
+Я добавил также простой "replace" -- работать будет только если время совпадает в точности.
 Время передается либо в time.time_struct либо float либо int (последние 2 -- секунды от 1970 г.).
 """
 import sys, time, MySQLdb
@@ -83,7 +83,7 @@ class Channel(object):
 
 class Storage(object):
     def __init__(self,\
-                 host =   "sndfs1.sndonline",
+                 host =   "sndfs1.inp.nsk.su",
                  user =   "author",
                  passwd = "power",
                  db     = "temdbase",

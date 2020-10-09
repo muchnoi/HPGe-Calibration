@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os, sys, getopt, time, string, gzip, ConfigParser
+import os, sys, getopt, time, gzip, configparser
 
 def Usage():
-  print '''
+  print('''
  ╔ Python script to process HPGe spectra. © 2005-2019 Nickolai Muchnoi ═══════════╗
  ║                                             ╭────────────────────────────────╮ ║
  ║ Usage: %0000000012s [options]               │ Last update: June 8, 2019      │ ║
@@ -33,15 +33,15 @@ def Usage():
  ║              --edge               : try to get beam energy from Compton edge.  ║
  ║              --escan              : deal with beam energy scan experiment.     ║
  ╚════════════════════════════════════════════════════════════════════════════════╝
- ''' % sys.argv[0].split('/')[-1];  sys.exit(0)
+ ''' % sys.argv[0].split('/')[-1]);  sys.exit(0)
 
 def List_TOI():
   from scale.atlas import Atlas
   OUT = {}
-  for k,v in Atlas().atlas.iteritems():
+  for k,v in Atlas().atlas.items():
     for el in v:
       OUT[el['W']] = "%5s(%4s): Eγ = %9.3f ± %5.3f keV" % (k, v.index(el), el['W'], el['dW'])
-  for key in sorted(OUT.keys()): print OUT[key]
+  for key in sorted(OUT.keys()): print(OUT[key])
   sys.exit(0)
 
 if ('-h' in sys.argv) or ('--help' in sys.argv):
@@ -62,7 +62,7 @@ else:
 class ToDo:
 
   def __init__(self):
-    cfg = ConfigParser.ConfigParser(); cfg.read('_globals_.cfg')
+    cfg = configparser.ConfigParser(); cfg.read('_globals_.cfg')
     if cfg.has_option('globals', 'data_folder'):  self.root = cfg.get('globals', 'data_folder')
     else:                                         exit()
     if cfg.has_option('globals', 'data_origin'):  self.orig = cfg.get('globals', 'data_origin')
@@ -71,7 +71,8 @@ class ToDo:
     try:
       Years = os.listdir(self.root);       Years.sort()
     except OSError:
-      print 'root folder does not exist!'; exit()
+      print(self.root)
+      print('root folder does not exist!'); exit()
 
     Days  = os.listdir(self.root+Years[-1])
     if len(Days)==1: Days.extend(os.listdir(self.root+Years[-2]));
@@ -94,7 +95,7 @@ class ToDo:
     try:
       opts, args = getopt.getopt(argv[1:], sopt, lopt)
     except getopt.GetoptError:
-      print 'Wrong option'; Usage(); sys.exit(2)
+      print('Wrong option'); Usage(); sys.exit(2)
 
     for opt, arg in opts:
       if   opt in ("-i", "--interactive"): self.prompt    = True;     self.online = False
@@ -114,7 +115,7 @@ class ToDo:
       elif opt in ("-g", "--generate")   : self.generate  = True;     self.online = False
       elif opt in ("-c", "--cfg")        : self.cfg_file  = arg;      self.online = False
       elif opt in ("-p", "--point")      : self.point     = arg;      self.online = False
-    cfg = ConfigParser.ConfigParser(); cfg.read(self.cfg_file)
+    cfg = configparser.ConfigParser(); cfg.read(self.cfg_file)
     if cfg.has_option('scale', 'file') and not S: self.scalefile = self.point + cfg.get('scale', 'file')
     if cfg.has_option('scale', 'tgap'):           self.tgap      =           cfg.getint('scale', 'tgap')
     if not self.online:
@@ -127,7 +128,7 @@ class ToDo:
       try:
         with open('%ssuccess.list' % self.point) as fp: file_list = fp.readlines()
       except IOError:
-        print 'Folder does not exist!'; exit()
+        print('Folder does not exist!'); exit()
       for i in range(len(file_list)): file_list[i] = file_list[i].strip('\n')
       file_list = [el for el in file_list if self.filename in el]
     else:
@@ -142,18 +143,18 @@ class ToDo:
         if os.path.isdir(folder):
           files = [el for el in os.listdir(folder) if self.filename in el]
           if first_date:
-            files = [el for el in files if int(string.split(el,'.')[0]) > self.tfrom]
+            files = [el for el in files if int(el.split('.')[0]) > self.tfrom]
             first_date = False
           for el in files: file_list.append(folder+el)
         else:
-          print 'File system warning: %s is not a folder' % folder;   sys.exit(1)
+          print('File system warning: %s is not a folder' % folder);   sys.exit(1)
       file_list.sort()
 
     if self.listonly:
       if self.online:
-        for f in file_list[-self.nfile:]: print f
+        for f in file_list[-self.nfile:]: print(f)
       else:
-        for f in file_list: print f;
+        for f in file_list: print(f);
       sys.exit(0)
     if self.online:
       if self.lastfile != file_list[-1]:
@@ -174,15 +175,15 @@ class Histogram:
 
   def __init__(self, todo):
     self.nfile, self.prompt, self.tokeV, self.folder, self.tgap = todo.nfile, todo.prompt, todo.tokeV, todo.point, todo.tgap
-    cfg = ConfigParser.ConfigParser(); cfg.read(todo.cfg_file)
+    cfg = configparser.ConfigParser(); cfg.read(todo.cfg_file)
     if cfg.has_option('scale', 'cdif'):  self.cdif = cfg.getfloat('scale', 'cdif')
     else:                                self.cdif = 0.01
     if   todo.edge and 'BEPC'   in todo.orig:
       try: from bepc.bepc     import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file)
-      except ImportError: print 'BEPC is not yet implemented'; exit(0)
+      except ImportError: print('BEPC is not yet implemented'); exit(0)
     elif todo.edge and 'VEPP2K' in todo.orig:
       try: from vepp2k.vepp2k import EDGE;  self.EME = EDGE(todo.scalefile, todo.cfg_file, todo.point)
-      except ImportError: print 'V2K is not yet implemented'; exit(0)
+      except ImportError: print('V2K is not yet implemented'); exit(0)
     if self.tokeV:
       if 'HPGe' in todo.orig:
         from scale.isotopes import Isotopes
@@ -208,9 +209,9 @@ class Histogram:
 
           self.UTE = SPEC.ute;  self.LiveT += SPEC.tLive;  n += 1;  filechain.append(flist[0])
           for nbin in range(self.nbins): self.hps.SetBinContent(nbin, self.hps.GetBinContent(nbin) + SPEC.DATA[nbin])
-          print 'Add:', flist[0]
+          print('Add:', flist[0])
         else:
-          print 'Skip:', flist[0]
+          print('Skip:', flist[0])
         flist.pop(0)
         if len(flist)==0: break
 
@@ -240,7 +241,7 @@ class Histogram:
         R = 0
         self.hps.GetXaxis().SetTitle('E_{#gamma}, channels')
         self.cv.cd(); self.cv.SetGrid(); self.hps.Draw('HIST'); self.cv.Modified(); self.cv.Update()
-      if self.prompt: raw_input('Press <Enter> to proceed')
+      if self.prompt: input('Press <Enter> to proceed')
     return R
 
 
@@ -257,7 +258,9 @@ class DataFile:
       return time.mktime(time.strptime("%8d%02d%02d%02d" % (d, H, M, S), "%Y%m%d%H%M%S")) # - self.TZ
     del self.DATA[:];    self.HAT.clear();    del self.PB5[:]
 
-    with gzip.open(ifile,'rb') as fp: self.DATA = fp.readlines()
+#    with gzip.open(ifile,'rb') as f: 
+    for line in gzip.open(ifile,'rb'): self.DATA.append(line.decode('utf-8'))
+
     while self.DATA[0][0] == '#':
       T = self.DATA.pop(0)[1:].strip().split()
       if 'PB5' in T[0]:
@@ -268,18 +271,18 @@ class DataFile:
 
 #    if len(self.PB5)==0: self.PB5 = [0.4, 0.5, 0.55, 0.6, 0.9, 1.05, 1.5, 1.6, 1.75, 1.83, 2.0, 2.5, 3.0, 3.5, 4.0]
 #    self.PB5 = [0.800, 0.900, 1.100, 1.500, 1.800, 2.000, 2.500, 2.800, 3.200, 3.700, 4.500, 5.200, 5.400, 5.600]
-
+    
     if self.HAT['Tlive']>tmin:
       self.tLive = self.HAT['Tlive']
       self.utb   = UnixTime(self.HAT['Begin'], self.HAT['Date'])
       self.ute   = UnixTime(self.HAT['End'],   self.HAT['eDate'])
-      if self.HAT.has_key('pType'):   self.pType = self.HAT['pType']
+      if 'pType' in self.HAT:   self.pType = self.HAT['pType']
       else:                           self.pType = 'None'
-      if self.HAT.has_key('GRATING'): self.Grate = int(self.HAT['GRATING'])
+      if 'GRATING' in self.HAT: self.Grate = int(self.HAT['GRATING'])
       else:                           self.Grate = 0
       return True
     else:
-      print 'Data acquisition time is to short, only %d seconds' % int(self.HAT['Tlive'])
+      print('Data acquisition time is to short, only %d seconds' % int(self.HAT['Tlive']))
       return False
 
 
@@ -288,7 +291,7 @@ class DataFile:
     if self.ReadHat(ifile,tmin) and (len(self.DATA) == nbins):
       for i in range(len(self.DATA)): self.DATA[i] = int(self.DATA[i])
       return True
-    else:  print 'Wrong number of data lines in %s' % ifile; exit(1)
+    else:  print('Wrong number of data lines in %s' % ifile); exit(1)
 
 
 #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -308,10 +311,10 @@ def main(argv):
         A = EMSResults(todo.cfg_file, todo.point)
         A.ShowRunInfo()
         A.EnergySpread()
-        raw_input()
+        input()
     elif todo.generate:
       if 'VEPP2K' in todo.orig:
-        T = raw_input('Do you understand what you are going to do?')
+        T = input('Do you understand what you are going to do?')
         if 'Y' in T or 'y' in T:
           from vepp2k.vepp2k import Points_Splitter
           A = Points_Splitter()
@@ -340,8 +343,8 @@ def main(argv):
             break
         else:
           break
-      raw_input('All done. <Enter> to quit.')
-  except KeyboardInterrupt: print '\nExecution is interrupted'
+      input('All done. <Enter> to quit.')
+  except KeyboardInterrupt: print('\nExecution is interrupted')
 #  del A
   exit()
 

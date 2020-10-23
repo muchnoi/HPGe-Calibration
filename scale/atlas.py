@@ -11,7 +11,9 @@ class Atlas:
     self.atlas[' K40 ']   =   [{'W':1460.750, 'dW':.060 }]
     self.atlas['annig']   =   [{'W': 510.998, 'dW':.060 }]
 
-    self.atlas[' O16 ']   =   [{'W':6129.075, 'dW':.050 }]
+    self.atlas[' O16 ']   =   [{'W':6129.12, 'dW':.050 }]
+    self.atlas[' O16 '].append({'W':self.atlas[' O16 '][0]['W']-  self.me, 'dW':.050 })
+    self.atlas[' O16 '].append({'W':self.atlas[' O16 '][0]['W']-2*self.me, 'dW':.050 })
 
     """
     self.atlas[' O16 ']   =   [{'W':6128.630, 'dW':.040  }]
@@ -71,6 +73,8 @@ class Atlas:
     self.atlas['Tl208'].append({'W': 583.187, 'dW':.005, 'I':.85100, 'dI':.00900 })
     self.atlas['Tl208'].append({'W': 860.560, 'dW':.030, 'I':.12600, 'dI':.00200 })
     self.atlas['Tl208'].append({'W':2614.511, 'dW':.010, 'I':.99900, 'dI':.00400 })
+    self.atlas['Tl208'].append({'W':self.atlas['Tl208'][2]['W']  -self.me, 'dW':.010})
+    self.atlas['Tl208'].append({'W':self.atlas['Tl208'][2]['W']-2*self.me, 'dW':.010})
     """
     self.atlas['Tl208'].append({'W': 211.400, 'dW':.150, 'I':.00018, 'dI':.00001 })
     self.atlas['Tl208'].append({'W': 233.360, 'dW':.150, 'I':.00290, 'dI':.00030 })
@@ -94,31 +98,6 @@ class Atlas:
     self.atlas['Tl208'].append({'W':1282.800, 'dW':.300, 'I':.00050, 'dI':.00006 })
     """
 
-    """
-    for nucl, lines in self.atlas.iteritems():
-      n,T = 0,[]
-      for line in lines:
-        n+=1
-        if line['W']>2000.0: # Add single- and double-escape peaks
-          T.append({'Key':line['Key']+'se', 'W': line['W']-   self.me, 'dW':line['dW']  })
-          T.append({'Key':line['Key']+'de', 'W': line['W']-2.*self.me, 'dW':line['dW']  })
-      for elem in T: lines.append(elem)
-    """
-
-# The following were measured by using the previous to calibrate HPGe
-#    self.atlas['Ac228']   =   [{'W': 911.282, 'dW':.004  , 'Compton':.0099 }]
-#    self.atlas['Ac228'].append({'W': 964.799, 'dW':.010   })
-
-
-#      print nucl
-#      for line in lines:
-#        print "%8s\t%8.3f" % (line['Key'], line['W'])
-#      raw_input()
-
-#        for next in lines[n:]: # Possible summs of two gammas
-#          if line['W']+next['W'] > 2615.0:
-#            T.append({'Key':line['Key']+'+'+next['Key'], 'W': line['W']+next['W'],
-#                     'dW':sqError([line['dW'],next['dW']])  })
 
 
   def __del__(self):

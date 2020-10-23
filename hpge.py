@@ -4,9 +4,9 @@ import os, sys, getopt, time, gzip, configparser
 
 def Usage():
   print('''
- ╔ Python script to process HPGe spectra. © 2005-2019 Nickolai Muchnoi ═══════════╗
+ ╔ Python script to process HPGe spectra. © 2005-2020 Nickolai Muchnoi ═══════════╗
  ║                                             ╭────────────────────────────────╮ ║
- ║ Usage: %0000000012s [options]               │ Last update: June 8, 2019      │ ║
+ ║ Usage: %0000000012s [options]               │ Last update: October 20, 2020  │ ║
  ║                                             ╰────────────────────────────────╯ ║
  ║ List of options:                                                               ║
  ║ -h,          --help               : print this help message and exit.          ║
@@ -44,10 +44,8 @@ def List_TOI():
   for key in sorted(OUT.keys()): print(OUT[key])
   sys.exit(0)
 
-if ('-h' in sys.argv) or ('--help' in sys.argv):
-  Usage()
-elif ('--toi' in sys.argv):
-  List_TOI()
+if ('-h' in sys.argv) or ('--help' in sys.argv):  Usage()
+elif ('--toi' in sys.argv):                       List_TOI()
 else:
   import ROOT
 #  ROOT.gROOT.LoadMacro(sys.argv[0].replace(sys.argv[0].split('/')[-1], 'vepp2k/airy_ai_int.C'))
@@ -215,7 +213,7 @@ class Histogram:
         flist.pop(0)
         if len(flist)==0: break
 
-      threshold = 1000
+      threshold = 100
       for nbin in range(threshold):
         self.hps.SetBinContent(nbin, 0); self.hps.SetBinError(nbin, 0)
       for nbin in range(threshold, self.nbins):
@@ -258,7 +256,6 @@ class DataFile:
       return time.mktime(time.strptime("%8d%02d%02d%02d" % (d, H, M, S), "%Y%m%d%H%M%S")) # - self.TZ
     del self.DATA[:];    self.HAT.clear();    del self.PB5[:]
 
-#    with gzip.open(ifile,'rb') as f: 
     for line in gzip.open(ifile,'rb'): self.DATA.append(line.decode('utf-8'))
 
     while self.DATA[0][0] == '#':
@@ -277,9 +274,9 @@ class DataFile:
       self.utb   = UnixTime(self.HAT['Begin'], self.HAT['Date'])
       self.ute   = UnixTime(self.HAT['End'],   self.HAT['eDate'])
       if 'pType' in self.HAT:   self.pType = self.HAT['pType']
-      else:                           self.pType = 'None'
+      else:                     self.pType = 'None'
       if 'GRATING' in self.HAT: self.Grate = int(self.HAT['GRATING'])
-      else:                           self.Grate = 0
+      else:                     self.Grate = 0
       return True
     else:
       print('Data acquisition time is to short, only %d seconds' % int(self.HAT['Tlive']))

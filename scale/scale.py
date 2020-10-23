@@ -1,5 +1,5 @@
 import ROOT, time, os, sys, configparser, pickle
-import numpy as np
+from ctypes import c_double
 from scale.atlas import Atlas
 from scipy.interpolate import UnivariateSpline
 
@@ -47,11 +47,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.LineShape = LineShape()
       self.asps = ROOT.TF1('asps', self.LineShape, 0.0, 1.0, 7);    self.asps.SetLineColor(ROOT.kBlue+2)
       self.asps.SetParNames('Amp','E_{0}, keV', '#sigma_{R}, keV', '#sigma_{L}/#sigma_{R}, keV', 'Compton', 'Background', '#kappa')
-      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.5, 10.00),  (1.0, 5.0), (0.0,100.0), (0.0, 1.e+6), (1.0, 10.0) )
-#      self.asps.SetParameters(1., 10., 1., 1., 0., 0., 1.)
-#      V = self.asps.Eval(6.)
-#      print(V)
-#      exit()
+      self.p_limits = ((1.0, 1.e+7), (50.0, 1.e+4), (0.25, 10.00),  (1.0, 5.0), (0.0,100.0), (0.0, 1.e+6), (1.0, 10.0) )
     else:
       self.cv   =  ROOT.TCanvas('cv','HPGe calibration', 2, 2, 1002, 502)
       self.PADS = [ROOT.TPad('PAD5', 'Scale',      0.01, 0.01, 0.49, 0.99, 0, 1),
@@ -68,7 +64,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.ResolutionModel = ResolutionModel()
     self.eres     = ROOT.TF1('eres', self.ResolutionModel, -self.emax, self.emax, 3) # combined resolution model [%]
     self.eres.SetParameters(1.0,  0.24, 0.1e-6, 100.0); self.eres.SetLineColor(self.Colors[0])
-    self.eres.SetParLimits(0, 0.5, 10.0); self.eres.SetParLimits(1, 0.05, 0.5); self.eres.SetParLimits(2, 0.05, 0.5)
+#    self.eres.SetParLimits(0, 0.25, 10.0); self.eres.SetParLimits(1, 0.01, 0.5); self.eres.SetParLimits(2, 0.01, 0.5)
 
     self.pulr     = ROOT.TF1('pulr', '100.0*([0]/abs(x)+[1])',  -self.emax, self.emax) # pulser resolution [%]
     self.pulr.SetParameters(1.0, 0.0); self.pulr.SetLineColor(self.Colors[1])
@@ -93,7 +89,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.ShowScale(0)
     if len(self.ScalePeaks)>2:
       for itr in range(1, self.nitr+1):
-        self.fitPeaks(L = self.fitL, R = self.fitR)
+        self.fitPeaks(itr, L = self.fitL, R = self.fitR)
         self.Show_Energy_Scale(self.Do_Energy_Scale(self.nitr == itr))
         self.hps.SetBins(self.nbins, self.zero, self.zero + self.gain * self.nbins)
       self.ShowScale(1)
@@ -102,6 +98,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.Save_Calibration()
     else:
       input('Scale calibration is impossible!')
+    self.MeasureLineEnergy(' O16 (   0)')
     return self.zero, self.gain
       #      for i in range(7): self.PADS[i].SaveAs('PAD%1d.eps' % i)
 
@@ -180,7 +177,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if len(self.PulsePeaks) < 4 : self.PB5=False
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-  def fitPeaks(self, L = 2.0, R = 2.0):
+  def fitPeaks(self, itr, L = 2.0, R = 2.0):
     for p in self.ScalePeaks + self.PulsePeaks + self.OtherPeaks:
       PB5, ALREADY = p['name'][-1]=='V', 'shape' in p
       if   ALREADY: # if peak was fitted already:   Amplitude,  Position, Sigma_R, Sigma_L/Sigma_R, Compton, Background, kappa
@@ -190,7 +187,8 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       else:   # if a peak was not fitted yet:   Amplitude,  Position, Sigma_R, Sigma_L/Sigma_R, Compton, Background, kappa
         p0,p1,p2,p3,p4,p5,p6  = p['A'], p['X'], 1.0, 1.0, 0.00,  p['B'], 1.5
       self.asps.SetParameters(p0,p1,p2,p3,p4,p5,p6)
-      self.asps.SetRange(p1 - L*p2*p3, p1 + R*p2)
+#      self.asps.SetRange(p1 - L*p2*p3, p1 + R*p2)
+      self.asps.SetRange(p1 - (L + self.nitr - itr)*p2*p3, p1 + (R + self.nitr - itr)*p2)
       for np in range(7): self.asps.SetParLimits(np, self.p_limits[np][0], self.p_limits[np][1])
       if PB5:
         self.asps.FixParameter(3, 1.0)
@@ -199,7 +197,8 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         self.asps.FixParameter(6, self.kapp.Eval(p1) )
       for attempt in range(3):
         Result = self.hps.Fit('asps', 'RSQN')
-        if not Result.Status(): break # print Result.Print()
+        if not Result.Status(): break 
+#        else: print(itr, attempt, p['name'])# print Result.Print()
       if PB5:
         self.asps.ReleaseParameter(3)
         self.asps.ReleaseParameter(4)
@@ -213,6 +212,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       if OK or not ALREADY:
         p['shape'] = P
       else:
+        print(p['name'], P['p0'], P['dp0'])
         if   p in self.ScalePeaks: self.ScalePeaks.remove(p)
         elif p in self.PulsePeaks: self.PulsePeaks.remove(p)
         elif p in self.OtherPeaks: self.OtherPeaks.remove(p)
@@ -230,6 +230,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     L, R, N, M = C-SL*(VLEVO+1), C+SR*(VPRAVO+1), '', ''
     for c in p['name'][0:5]:
       if   c.isdigit(): N+=c
+      elif M=='P' and c.isspace(): break
       elif c.isspace(): pass
       else:             M+=c
     name  = '^{%s}%s' % (N,M)
@@ -273,11 +274,11 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.gain =  self.gain     / (1.+k1)
 
 # 2) JUST SHOW OTHER GAMMA LINES
-#    self.S2.Set(len(self.OtherPeaks))
-#    for pk in self.OtherPeaks:
-#      n = self.OtherPeaks.index(pk)
-#      self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
-#      self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
+    self.S2.Set(len(self.OtherPeaks))
+    for pk in self.OtherPeaks:
+      n = self.OtherPeaks.index(pk)
+      self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
+      self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
 
 # 3) pulser LINES
     self.spline = True
@@ -292,7 +293,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         V.append(pk['V']);  E.append(pk[K]['p1']);  dE.append(dY)
       if fin:
         W = [V,E,dE]
-        with open('pulser.table','w') as fp:  pickle.dump(W, fp, -1)
+        with open('pulser.table','wb') as fp:  pickle.dump(W, fp, -1)
     elif fin:
       self.S1.Set(0)
       try:
@@ -308,15 +309,15 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.pulser_correction_fit_result = self.S0.Fit('SplineB','QRNS')
       if self.pulser_correction_fit_result.Prob() < 0.00001:
         self.spline = False
-      else:
-        x, e = np.fromiter(E, 'float64'), np.ndarray(len(E), 'float64')
+      else:  
+        cda = c_double*len(E);  x, e = cda(*E), cda() 
         self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
         P = fitParameters(self.SplineB)
         self.zero_p, self.gain_p = P['p0'], P['p1']
         if not fin:
           for pk in self.PulsePeaks:
             pk['E']  = P['p0'] + P['p1']*pk['V']
-#        pk['dE'] = e[self.PulsePeaks.index(pk)]
+            pk['dE'] = e[self.PulsePeaks.index(pk)]
     if self.spline:
       return '#chi^{2}/NDF = %5.1f/%3d' % (self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf())
     else:
@@ -466,6 +467,26 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     print(' ╚════════════════════════════════════════╧═══════════════════════════════════════╝\n')
 
 
+# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+  def MeasureLineEnergy(self, line_name):
+    for p in self.OtherPeaks: 
+      if p['name']==line_name:
+        print('The {} line energy measurement:'.format(line_name))
+        W, dW = p['shape']['p1'], p['shape']['dp1']
+        print('E_fit = {:8.3f} ± {:5.3f} keV'.format(W, dW))
+        cda = c_double*1;  x, e = cda(W), cda() 
+        if self.spline:
+          self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, e, 0.683, False)
+          C,  dC = self.SplineB.Eval(W), e[0]
+        else: C, dC = 0.0, 0.0
+        print('P_cor = {:8.3f} ± {:5.3f} keV'.format(C, dC))
+        E, dE = W - C, (dW**2 + dC**2)**0.5
+        print('E_cor = {:8.3f} ± {:5.3f} keV'.format(E, dE))
+#        self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, e, 0.683, False)
+#        dA = e[0]
+#        print(dA)
+        break
+
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def InitParameters(self, cfg_file):
@@ -529,7 +550,6 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     print('Calibration results have been saved to %s' % self.outfile)
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
-# +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def Get_Calibration(self, t = 0, w = 1000.0, pause = False):
     data = []
     OD = {'T':[], 'dT':[], 'Z':[], 'G':[], 'N':[], 'dW':[], 'C':[], 'dC':[], 'R':[], 'dR':[], 'L':[], 'dL':[], 'X':[]}
@@ -547,16 +567,16 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         if len(self.PulsePeaks) < 3: self.PB5 = False
         self.Show_Energy_Scale(self.Do_Energy_Scale(True))
         self.Show_Energy_Resolution(self.Do_Energy_Resolution())
-        x = np.ndarray(2, 'float64');   x[0], x[1] =  w, -w;   er = np.ndarray(2, 'float64')
-        self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
-        dW = er[0]
+        cda = c_double*2;  x, e = cda(w, -w), cda() 
+        self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, e, 0.683, False)
+        dW = e[0]
         if self.spline:
-          self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, er, 0.683, False)
-          C,  dC = self.SplineB.Eval(w), er[0]
+          self.pulser_correction_fit_result.GetConfidenceIntervals(1, 1, 1, x, e, 0.683, False)
+          C,  dC = self.SplineB.Eval(w), e[0]
         else: C, dC = 0.0, 0.0
-        self.real_resolution_fit_result.GetConfidenceIntervals(2, 1, 1, x, er, 0.683, False)
-        SR, dSR = 0.01*w*self.eres.Eval( w), 0.01*w*er[0]
-        SL, dSL = 0.01*w*self.eres.Eval(-w), 0.01*w*er[1]
+        self.real_resolution_fit_result.GetConfidenceIntervals(2, 1, 1, x, e, 0.683, False)
+        SR, dSR = 0.01*w*self.eres.Eval( w), 0.01*w*e[0]
+        SL, dSL = 0.01*w*self.eres.Eval(-w), 0.01*w*e[1]
         """
         https://root.cern.ch/root/html/ROOT__Fit__FitResult.html
         GetConfidenceIntervals(unsigned int n, unsigned int stride1, unsigned int stride2, const double* x, double* ci, double cl, bool norm = true)

@@ -310,14 +310,14 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       if self.pulser_correction_fit_result.Prob() < 0.00001:
         self.spline = False
       else:  
-        cda = c_double*len(E);  x, e = cda(*E), cda() 
-        self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
+#        cda = c_double*len(E);  x, e = cda(*E), cda() 
+#        self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
         P = fitParameters(self.SplineB)
         self.zero_p, self.gain_p = P['p0'], P['p1']
         if not fin:
           for pk in self.PulsePeaks:
             pk['E']  = P['p0'] + P['p1']*pk['V']
-            pk['dE'] = e[self.PulsePeaks.index(pk)]
+#            pk['dE'] = e[self.PulsePeaks.index(pk)]
     if self.spline:
       return '#chi^{2}/NDF = %5.1f/%3d' % (self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf())
     else:

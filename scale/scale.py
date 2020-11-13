@@ -20,8 +20,8 @@ class BSpline:  # class # class # class # class # class # class # class # class 
 
 
 class Scale(Atlas): # class # class # class # class # class # class # class # class # class # class # class # class # class
-  Colors = [ROOT.kRed+2, ROOT.kGreen+3, ROOT.kBlue+2]
-  Styles = [20,  22,  24];    Sizes  = [1.25, 1.0, 1.0]
+  Colors = [ROOT.kRed+2, ROOT.kGreen+3, ROOT.kBlue+2, ROOT.kBlue-10]
+  Styles = [20,  22,  24, 26];    Sizes  = [1.25, 1.0, 1.0, 1.0]
   emin, emax = 100., 10000.  # just for a case when no *.cfg file is present
 
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -58,7 +58,12 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.lisc     = ROOT.TF1('lisc', '[0] + [1]*x',                self.emin, self.emax) # linear scale calibration
     self.bspline  = BSpline()
     self.SplineB  = ROOT.TF1('SplineB', self.bspline, self.emin, self.emax, 2)
-    self.SplineB.SetLineColor(self.Colors[1]); self.SplineB.SetLineWidth(2); self.SplineB.SetNpx(250);
+    self.SplineB.SetLineColor(self.Colors[1]); self.SplineB.SetLineWidth(2); self.SplineB.SetNpx(250)
+    self.npci = 50  # number of points for confidence intervals plot
+    tac = c_double*self.npci;  
+    self.xci, self.eci = tac(), tac()
+    for i in range(self.npci): self.xci[i] = self.emin + i*(self.emax-self.emin)/self.npci
+
     # Energy Resolution Section
     self.ERG      = ROOT.TMultiGraph(); self.ERG.SetTitle('#sigma_{E} / E [%]')
     self.ResolutionModel = ResolutionModel()
@@ -263,39 +268,39 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
   def Do_Energy_Scale(self, fin):
     K = 'shape'
 # 1) LINEAR SCALE CORRECTION WITH CALIBRATION GAMMA LINES
-    self.S0.Set(len(self.ScalePeaks))
+    self.S[0].Set(len(self.ScalePeaks))
     for pk in self.ScalePeaks:
       n = self.ScalePeaks.index(pk)
-      self.S0.SetPoint(     n, pk[ 'E'],  pk[K]['p1'] - pk['E'])
-      self.S0.SetPointError(n, pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2)**0.5)
-    self.linear_scale_fit_result = self.S0.Fit('lisc','QRNS')
+      self.S[0].SetPoint(     n, pk[ 'E'],  pk[K]['p1'] - pk['E'])
+      self.S[0].SetPointError(n, pk['dE'], (pk['dE']**2 + pk[K]['dp1']**2)**0.5)
+    self.linear_scale_fit_result = self.S[0].Fit('lisc','QRNS')
     k0,  k1 = self.lisc.GetParameter(0), self.lisc.GetParameter(1)
     self.zero = (self.zero-k0) / (1.+k1)
     self.gain =  self.gain     / (1.+k1)
 
 # 2) JUST SHOW OTHER GAMMA LINES
-    self.S2.Set(len(self.OtherPeaks))
+    self.S[2].Set(len(self.OtherPeaks))
     for pk in self.OtherPeaks:
       n = self.OtherPeaks.index(pk)
-      self.S2.SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
-      self.S2.SetPointError(n, pk['dE'], pk[K]['dp1'])
+      self.S[2].SetPoint(     n, pk[ 'E'], pk[K][ 'p1'] - pk['E'])
+      self.S[2].SetPointError(n, pk['dE'], pk[K]['dp1'])
 
 # 3) pulser LINES
     self.spline = True
     if self.PB5:
       V,E,dE = [],[],[]
-      self.S1.Set(len(self.PulsePeaks))
+      self.S[1].Set(len(self.PulsePeaks))
       for pk in self.PulsePeaks:
         n = self.PulsePeaks.index(pk)
         dY = (pk['dE']**2 + pk[K]['dp1']**2)**0.5
-        self.S1.SetPoint(n,  pk['E'], pk[K]['p1'] - pk['E'])
-        self.S1.SetPointError(n, 0.0, dY)
+        self.S[1].SetPoint(n,  pk['E'], pk[K]['p1'] - pk['E'])
+        self.S[1].SetPointError(n, 0.0, dY)
         V.append(pk['V']);  E.append(pk[K]['p1']);  dE.append(dY)
       if fin:
         W = [V,E,dE]
         with open('pulser.table','wb') as fp:  pickle.dump(W, fp, -1)
     elif fin:
-      self.S1.Set(0)
+      self.S[1].Set(0)
       try:
         with open('pulser.table','rb') as fp:  V,E,dE = pickle.load(fp)
       except IOError:
@@ -306,18 +311,18 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     if self.spline:
       self.bspline.Reset(V,E,dE)
       self.SplineB.SetParameters(self.zero_p, self.gain_p)
-      self.pulser_correction_fit_result = self.S0.Fit('SplineB','QRNS')
+      self.pulser_correction_fit_result = self.S[0].Fit('SplineB','QRNS')
       if self.pulser_correction_fit_result.Prob() < 0.00001:
         self.spline = False
       else:  
-        cda = c_double*len(E);  x, e = cda(*E), cda() 
-        self.pulser_correction_fit_result.GetConfidenceIntervals(len(x), 1, 1, x, e, 0.683, False)
         P = fitParameters(self.SplineB)
         self.zero_p, self.gain_p = P['p0'], P['p1']
-        if not fin:
-          for pk in self.PulsePeaks:
-            pk['E']  = P['p0'] + P['p1']*pk['V']
-            pk['dE'] = e[self.PulsePeaks.index(pk)]
+        for pk in self.PulsePeaks: pk['E']  = self.zero_p + self.gain_p*pk['V']
+        self.S[3].Set(self.npci)
+        self.pulser_correction_fit_result.GetConfidenceIntervals(self.npci, 1, 1, self.xci, self.eci, 0.683, False)
+        for i in range(self.npci):
+          self.S[3].SetPoint(     i, self.xci[i], self.SplineB.Eval(self.xci[i]) )
+          self.S[3].SetPointError(i, self.xci[i], self.eci[i])
     if self.spline:
       return '#chi^{2}/NDF = %5.1f/%3d' % (self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf())
     else:
@@ -327,16 +332,19 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
   def Show_Energy_Scale(self, quality):
     xmin, xmax, ymin, ymax = MultiGraphLimits(self.NLG)
     self.PADS[0].cd();  self.PADS[0].Clear();  self.PADS[0].SetGrid()
-    self.NLG.Draw('AP');
-    self.NLG.GetXaxis().SetLimits(   xmin, xmax); self.NLG.GetXaxis().SetTitle(' E_{#gamma} [keV]')
-    self.NLG.GetYaxis().SetRangeUser(ymin, ymax); self.NLG.GetYaxis().SetDecimals()
+    self.NLG.GetXaxis().SetTitle(' E_{#gamma} [keV]')
+    self.NLG.GetYaxis().SetDecimals()
+    self.NLG.GetYaxis().SetLimits(ymin, ymax)
+    self.NLG.GetXaxis().SetRangeUser(xmin, xmax)
+    self.NLG.Draw('AP')
     self.Lg1.Clear()
-    self.Lg1.AddEntry(self.S0, 'reference lines', 'lpe')
-    self.Lg1.AddEntry(self.S1, 'pulser lines',    'lpe')
-    self.Lg1.AddEntry(self.S2, 'other lines',     'lpe')
-    self.Lg1.AddEntry(self.SplineB, quality, 'lpe')
+    self.Lg1.AddEntry(self.S[0], 'reference lines', 'lpe')
+    self.Lg1.AddEntry(self.S[1], 'pulser lines',    'lpe')
+    self.Lg1.AddEntry(self.S[2], 'other lines',     'lpe')
+    self.Lg1.AddEntry(self.S[3], 'confidence interval',      'f')
+    self.Lg1.AddEntry(self.SplineB, quality, 'l')
     self.Lg1.Draw('SAME')
-    if self.spline:  self.SplineB.Draw('SAME')
+    if self.spline: self.SplineB.Draw('SAME')
     self.cv.Modified();    self.cv.Update()
 
 
@@ -520,11 +528,16 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
   def InitGraphics(self):
     # Energy Scale Section
-    self.S0 = ROOT.TGraphErrors();          self.S1 = ROOT.TGraphErrors();          self.S2 = ROOT.TGraphErrors()
-    self.S0.SetMarkerColor(self.Colors[0]); self.S1.SetMarkerColor(self.Colors[1]); self.S2.SetMarkerColor(self.Colors[2])
-    self.S0.SetMarkerStyle(self.Styles[0]); self.S1.SetMarkerStyle(self.Styles[1]); self.S2.SetMarkerStyle(self.Styles[2])
-    self.S0.SetMarkerSize(self.Sizes[0]);   self.S1.SetMarkerSize(self.Sizes[1]);   self.S2.SetMarkerSize(self.Sizes[2])
-    self.NLG.Add(self.S0);                  self.NLG.Add(self.S1);                  self.NLG.Add(self.S2)
+    self.S = [ROOT.TGraphErrors() for i in range(4)]
+    self.S[3].SetFillStyle(1001)
+#    self.S[3].SetFillColor(self.Colors[3])
+    self.S[3].SetFillColorAlpha(self.Colors[3], 0.5)
+    self.NLG.Add(self.S[3], '3')
+    for i in [2,1,0]: 
+      self.S[i].SetMarkerColor(self.Colors[i])
+      self.S[i].SetMarkerStyle(self.Styles[i])
+      self.S[i].SetMarkerSize(self.Sizes[i])
+      self.NLG.Add(self.S[i], 'p')
     self.Lg1= ROOT.TLegend(0.62, 0.75, 0.99, 1.00, '', 'brNDC')
     # Energy Resolution Section
     self.RC = ROOT.TGraphErrors();          self.RP = ROOT.TGraphErrors();          self.RO = ROOT.TGraphErrors();

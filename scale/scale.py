@@ -103,7 +103,8 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.Save_Calibration()
     else:
       input('Scale calibration is impossible!')
-    self.MeasureLineEnergy(' O16 (   0)')
+#    self.MeasureLineEnergy(' O16 (   0)')
+    self.MeasureLineEnergy('Tl208(   2)')
     return self.zero, self.gain
       #      for i in range(7): self.PADS[i].SaveAs('PAD%1d.eps' % i)
 
@@ -490,9 +491,6 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         print('P_cor = {:8.3f} ± {:5.3f} keV'.format(C, dC))
         E, dE = W - C, (dW**2 + dC**2)**0.5
         print('E_cor = {:8.3f} ± {:5.3f} keV'.format(E, dE))
-#        self.linear_scale_fit_result.GetConfidenceIntervals(1, 1, 1, x, e, 0.683, False)
-#        dA = e[0]
-#        print(dA)
         break
 
 

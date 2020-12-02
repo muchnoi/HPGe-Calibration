@@ -31,7 +31,6 @@ class Atlas:
 
     self.atlas['Mn56 ']   =   [{'W': 846.764, 'dW':.020 }]
     self.atlas['Mn56 '].append({'W':1810.726, 'dW':.040 })
-    """
 
     self.atlas['In116'] = []
     self.atlas['In116'].append({'W': 416.860, 'dW':.030, 'I':27.7, 'dI':.120 })
@@ -41,7 +40,6 @@ class Atlas:
     self.atlas['In116'].append({'W':1507.670, 'dW':.040, 'I':10.0, 'dI':.030 })
     self.atlas['In116'].append({'W':2112.312, 'dW':.022, 'I':15.5, 'dI':.040 })
 
-    """
     self.atlas['FePNG'] = []
     self.atlas['FePNG'].append({'W': 139.750, 'dW':.030, 'I':.005, 'dI':.001 })
     self.atlas['FePNG'].append({'W': 198.380, 'dW':.030, 'I':.005, 'dI':.001 })
@@ -66,7 +64,7 @@ class Atlas:
 
     self.atlas['Bi212'] = []
     self.atlas['Bi212'].append({'W': 727.330, 'dW':.010, 'I':.068 })
-    self.atlas['Bi212'].append({'W': 785.370, 'dW':.080, 'I':.01094, 'dI':.00024 })
+    self.atlas['Bi212'].append({'W': 785.370, 'dW':.090, 'I':.01094, 'dI':.00024 })
     self.atlas['Bi212'].append({'W':1620.740, 'dW':.010, 'I':.015, 'dI':.00040 })
 
     self.atlas['Tl208'] = []

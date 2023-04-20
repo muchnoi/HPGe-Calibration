@@ -234,7 +234,7 @@ class Histogram:
         self.CALIBRATION.LiveT = self.LiveT
         R = self.CALIBRATION.Do(self.UTB, self.UTE, SPEC.PB5, self.hps, ptype)
       elif self.EME:
-        R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain, SPEC.Grate)
+        R = self.EME.Go(self.UTB, self.UTE, self.hps, filechain, SPEC.Grate, SPEC.V2I, SPEC.V2E)
       else:
         R = 0
         self.hps.GetXaxis().SetTitle('E_{#gamma}, channels')
@@ -273,6 +273,10 @@ class DataFile:
       self.tLive = self.HAT['Tlive']
       self.utb   = UnixTime(self.HAT['Begin'], self.HAT['Date'])
       self.ute   = UnixTime(self.HAT['End'],   self.HAT['eDate'])
+      if 'Ie[mA]'  in self.HAT: self.V2I = self.HAT['Ie[mA]']
+      else:                     self.V2I = 0.0
+      if 'Eo[MeV]' in self.HAT: self.V2E = self.HAT['Eo[MeV]']
+      else:                     self.V2E = 0.0
       if 'pType' in self.HAT:   self.pType = self.HAT['pType']
       else:                     self.pType = 'None'
       if 'GRATING' in self.HAT: self.Grate = int(self.HAT['GRATING'])
@@ -307,7 +311,7 @@ def main(argv):
         from vepp2k.vepp2k import EMSResults
         A = EMSResults(todo.cfg_file, todo.point)
         A.ShowRunInfo()
-        A.EnergySpread()
+#        A.EnergySpread()
         input()
     elif todo.generate:
       if 'VEPP2K' in todo.orig:

@@ -102,7 +102,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
       self.Show_Energy_Resolution(self.Do_Energy_Resolution())
       self.Save_Calibration()
     else:
-      input('Scale calibration is impossible!')
+      print ('Scale calibration is impossible!')
 #    self.MeasureLineEnergy(' O16 (   0)')
 #    self.MeasureLineEnergy('Tl208(   2)')
     return self.zero, self.gain
@@ -139,7 +139,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     self.ScalePeaks, self.OtherPeaks = [], []
 #    self.PB5 = []
     if self.PB5:
-      self.PulsePeaks = [{'name':'P%02d %5.3f V' % (self.PB5.index(v), v), 'V':v, 'E':self.zero_p + self.gain_p*v, 'dE':self.eerr_p} for v in self.PB5]
+      self.PulsePeaks = [{'name':'P%02d %5.3f V' % (self.PB5.index(v), v), 'V':v, 'E':self.zero_p + self.gain_p*v, 'dE':self.eerr_p} for v in self.PB5[1:]]
       self.PB5 = True
     else:
       self.PulsePeaks = []
@@ -167,7 +167,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
           if name: break
       if not name and A>10.:
         print('Unknown line: % 8.2f keV (Amp=%4d)' % (x, A))
-        if x > 2000.:
+        if x > 6000.:
           name = "Unknown(%2d)" % unkn
           V = {'name':name, 'E':x, 'dE':2*self.gain, 'X':x, 'A':A, 'B':B}
           self.OtherPeaks.append(V)
@@ -558,6 +558,7 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
     W['infos'] = [self.UTB, self.UTE, self.ptype, self.PB5]
     W['scale'] = [self.zero, self.gain, self.zero_p, self.gain_p]
     W['peaks'] = [self.ScalePeaks, self.PulsePeaks, self.OtherPeaks]
+#    W['peaks'] = [self.ScalePeaks, self.PulsePeaks]
     if self.PB5:
       W['scl_Q'] = [self.pulser_correction_fit_result.Chi2(), self.pulser_correction_fit_result.Ndf()]
     else:
@@ -580,6 +581,8 @@ class Scale(Atlas): # class # class # class # class # class # class # class # cl
         self.zero,   self.gain, self.zero_p, self.gain_p  = rec['scale'][0], rec['scale'][1], rec['scale'][2], rec['scale'][3]
         self.ScalePeaks, self.PulsePeaks, self.OtherPeaks = rec['peaks'][0], rec['peaks'][1], rec['peaks'][2]
         allp = [int(el['shape']['p1']) for el in self.ScalePeaks + self.PulsePeaks + self.OtherPeaks]
+#        self.ScalePeaks, self.PulsePeaks = rec['peaks'][0], rec['peaks'][1]
+#        allp = [int(el['shape']['p1']) for el in self.ScalePeaks + self.PulsePeaks]
         self.OtherPeaks = []
         if len(self.PulsePeaks) < 3: self.PB5 = False
 #        self.Show_Energy_Scale(self.Do_Energy_Scale(True))
